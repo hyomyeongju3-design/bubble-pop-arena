@@ -1,0 +1,2684 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BUBBLE POP ARENA // 버블 팝 아레나</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Fredoka:wght@600;700&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+
+        .font-arcade {
+            font-family: 'Fredoka', 'Black Han Sans', sans-serif;
+        }
+
+        .font-title {
+            font-family: 'Black Han Sans', 'Fredoka', sans-serif;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Crisp Arcade Toy-Box UI Styling */
+        .arcade-panel {
+            background: #fffbeb;
+            border: 4px solid #1e293b;
+            box-shadow: 0 8px 0 #1e293b, 0 14px 24px rgba(15, 23, 42, 0.35);
+            border-radius: 24px;
+        }
+
+        .arcade-btn {
+            border: 3px solid #1e293b;
+            box-shadow: 0 5px 0 #1e293b;
+            transition: transform 0.08s ease, box-shadow 0.08s ease;
+        }
+        .arcade-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #1e293b;
+        }
+
+        .title-stroke {
+            text-shadow:
+                -3px -3px 0 #1e293b,
+                 3px -3px 0 #1e293b,
+                -3px  3px 0 #1e293b,
+                 3px  3px 0 #1e293b,
+                 0px  6px 0 #1e293b;
+        }
+
+        @keyframes bobble {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-6px) scale(1.03); }
+        }
+        .animate-bobble {
+            animation: bobble 2.2s ease-in-out infinite;
+        }
+
+        /* Mobile Touch Pad Styling */
+        .dpad-btn {
+            background: rgba(255, 255, 255, 0.85);
+            border: 3px solid #1e293b;
+            box-shadow: 0 4px 0 #1e293b;
+            border-radius: 16px;
+        }
+        .dpad-btn:active, .dpad-btn.active {
+            background: #fde047;
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #1e293b;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden">
+
+    <!-- Main Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- =========================================================
+         TOP HUD BAR (IN-GAME)
+    ========================================================== -->
+    <div id="hudTop" class="hidden fixed top-3 left-1/2 -translate-x-1/2 z-20 w-full max-w-4xl px-3 flex items-center justify-between gap-2 pointer-events-none">
+        <!-- Player Stats Pill -->
+        <div class="arcade-panel px-4 py-1.5 flex items-center gap-4 pointer-events-auto">
+            <div class="flex items-center gap-1.5">
+                <span class="text-xl">💧</span>
+                <span class="text-xs font-bold text-slate-600">물풍선</span>
+                <strong id="hudBombMax" class="font-arcade text-lg text-sky-600">1</strong>
+            </div>
+            <div class="w-px h-5 bg-slate-300"></div>
+            <div class="flex items-center gap-1.5">
+                <span class="text-xl">🌊</span>
+                <span class="text-xs font-bold text-slate-600">물줄기</span>
+                <strong id="hudRange" class="font-arcade text-lg text-blue-600">1</strong>
+            </div>
+            <div class="w-px h-5 bg-slate-300"></div>
+            <div class="flex items-center gap-1.5">
+                <span class="text-xl">🛼</span>
+                <span class="text-xs font-bold text-slate-600">속도</span>
+                <strong id="hudSpeed" class="font-arcade text-lg text-amber-600">1</strong>
+            </div>
+            <div class="w-px h-5 bg-slate-300"></div>
+            <button id="btnUseNeedle" onclick="useNeedle()" class="arcade-btn px-2.5 py-1 rounded-xl bg-rose-100 text-xs font-black text-rose-700 flex items-center gap-1 cursor-pointer">
+                <span>📌 바늘</span>
+                <span id="hudNeedles" class="font-arcade text-sm bg-rose-500 text-white px-1.5 rounded-md">1</span>
+            </button>
+        </div>
+
+        <!-- Stage & Timer -->
+        <div class="arcade-panel px-5 py-1.5 flex items-center gap-4">
+            <div id="hudModeLabel" class="text-xs font-black text-slate-700">
+                STAGE <span id="hudStage" class="font-arcade text-lg text-emerald-600">1</span>
+            </div>
+            <div class="w-px h-5 bg-slate-300"></div>
+            <div id="hudTimer" class="font-arcade text-xl text-slate-900">02:30</div>
+        </div>
+
+        <!-- Sound & Menu Buttons -->
+        <div class="flex items-center gap-2 pointer-events-auto">
+            <button id="btnAudio" onclick="toggleAudio()" class="arcade-btn bg-white px-3 py-2 rounded-xl text-xs font-black text-slate-800 cursor-pointer">
+                🔊 ON
+            </button>
+            <button onclick="returnToLobby()" class="arcade-btn bg-amber-300 px-3 py-2 rounded-xl text-xs font-black text-slate-900 cursor-pointer">
+                로비
+            </button>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         LOBBY / CHARACTER & MAP SELECT SCREEN
+    ========================================================== -->
+    <div id="screenLobby" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-sky-900/35 backdrop-blur-xs overflow-y-auto">
+        <div class="arcade-panel max-w-3xl w-full p-5 md:p-7 flex flex-col gap-4 my-auto">
+            
+            <!-- Game Logo Header -->
+            <div class="text-center">
+                <div class="inline-block px-4 py-1 rounded-full bg-amber-300 border-2 border-slate-900 text-xs font-black text-slate-900 mb-1.5">
+                    CLASSIC ARCADE WATER BOMB BATTLE
+                </div>
+                <h1 class="text-3xl md:text-5xl font-title text-white title-stroke tracking-wide animate-bobble">
+                    버블 팝 <span class="text-amber-300">아레나</span>
+                </h1>
+                <p class="text-slate-600 text-xs font-bold mt-1.5">
+                    블록을 터뜨려 아이템을 모으고, 물방울에 갇힌 라이벌을 톡 터뜨려 제압하세요!
+                </p>
+            </div>
+
+            <!-- Character & Map Selection Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <!-- Left: Character Selection -->
+                <div class="bg-sky-50 border-3 border-slate-800 rounded-2xl p-3.5">
+                    <div class="text-xs font-black text-slate-700 mb-2.5 flex items-center justify-between">
+                        <span>1. 캐릭터 선택</span>
+                        <span id="charTraitBadge" class="text-sky-600">밸런스형</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="selectCharacter('bazzi')" id="char-bazzi" class="arcade-btn bg-rose-400 text-white p-2.5 rounded-2xl flex flex-col items-center gap-1 cursor-pointer ring-4 ring-amber-300">
+                            <div class="w-10 h-10 rounded-full bg-rose-600 border-2 border-slate-900 flex items-center justify-center text-xl shadow-inner">🧢</div>
+                            <span class="font-black text-xs text-slate-900">다오니</span>
+                            <span class="text-[10px] font-bold text-rose-950">기본 균형</span>
+                        </button>
+
+                        <button onclick="selectCharacter('dao')" id="char-dao" class="arcade-btn bg-white text-slate-800 p-2.5 rounded-2xl flex flex-col items-center gap-1 cursor-pointer">
+                            <div class="w-10 h-10 rounded-full bg-sky-500 border-2 border-slate-900 flex items-center justify-center text-xl shadow-inner">💧</div>
+                            <span class="font-black text-xs">푸른이</span>
+                            <span class="text-[10px] font-bold text-slate-500">물풍선 +1</span>
+                        </button>
+
+                        <button onclick="selectCharacter('marid')" id="char-marid" class="arcade-btn bg-white text-slate-800 p-2.5 rounded-2xl flex flex-col items-center gap-1 cursor-pointer">
+                            <div class="w-10 h-10 rounded-full bg-amber-400 border-2 border-slate-900 flex items-center justify-center text-xl shadow-inner">⚡</div>
+                            <span class="font-black text-xs">번개</span>
+                            <span class="text-[10px] font-bold text-slate-500">초기 속도+</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right: Arena Theme Selection -->
+                <div class="bg-emerald-50 border-3 border-slate-800 rounded-2xl p-3.5">
+                    <div class="text-xs font-black text-slate-700 mb-2.5">2. 스테이지 테마 선택</div>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <button onclick="selectMap('village')" id="map-village" class="arcade-btn bg-emerald-400 p-2.5 rounded-2xl text-left cursor-pointer ring-4 ring-amber-300">
+                            <div class="text-lg mb-0.5">🏡</div>
+                            <div class="font-black text-xs text-slate-900">빌리지 10</div>
+                            <div class="text-[10px] font-bold text-emerald-950">클래식 블록 & 덤불</div>
+                        </button>
+
+                        <button onclick="selectMap('pirate')" id="map-pirate" class="arcade-btn bg-white p-2.5 rounded-2xl text-left cursor-pointer">
+                            <div class="text-lg mb-0.5">🏴‍☠️</div>
+                            <div class="font-black text-xs text-slate-900">해적선 갑판</div>
+                            <div class="text-[10px] font-bold text-slate-500">탁 트인 중앙 난전</div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Difficulty & AI Benchmark Calibration Bar -->
+            <div class="bg-rose-50 border-3 border-slate-800 rounded-2xl p-3 flex flex-col gap-2.5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-xs font-black text-slate-800 pl-1">3. AI 난이도 및 기준 선택</span>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button onclick="selectDifficulty('normal')" id="diff-normal" class="arcade-btn bg-white px-3 py-1.5 rounded-xl text-xs font-black text-slate-800 cursor-pointer">
+                            보통
+                        </button>
+                        <button onclick="selectDifficulty('hard')" id="diff-hard" class="arcade-btn bg-amber-300 px-3 py-1.5 rounded-xl text-xs font-black text-slate-900 cursor-pointer ring-3 ring-slate-900">
+                            🔥 어려움
+                        </button>
+                        <button onclick="selectDifficulty('hell')" id="diff-hell" class="arcade-btn bg-white px-3 py-1.5 rounded-xl text-xs font-black text-rose-700 cursor-pointer">
+                            💀 지옥
+                        </button>
+                        <button onclick="selectDifficulty('calibrated')" id="diff-calibrated" class="hidden arcade-btn bg-purple-500 text-white px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer">
+                            🧠 내 기준 AI (<span id="calibratedScoreBadge">0</span>점)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AI Level Calibration Test Banner -->
+                <div class="bg-white border-2 border-slate-800 rounded-xl px-3.5 py-2 flex flex-wrap items-center justify-between gap-2">
+                    <div class="text-xs">
+                        <span class="font-black text-purple-700">🧪 AI 수준 시험장 (벤치마크):</span>
+                        <span id="calibrationStatusText" class="font-bold text-slate-600 ml-1">직접 1분간 플레이해서 AI가 따라할 평균 기준을 측정합니다!</span>
+                    </div>
+                    <button onclick="startCalibrationTest()" class="arcade-btn bg-purple-400 hover:bg-purple-300 px-3 py-1.5 rounded-xl text-xs font-black text-slate-900 cursor-pointer">
+                        🎯 내 실력으로 AI 기준 측정하기
+                    </button>
+                </div>
+            </div>
+
+            <!-- Controls Guide Box -->
+            <div class="bg-amber-100/80 border-2 border-slate-800 rounded-2xl px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-800">
+                <div class="flex items-center gap-1.5">
+                    <span class="px-2 py-0.5 bg-white border-2 border-slate-800 rounded-lg font-arcade">방향키 / WASD</span>
+                    <span>이동</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="px-2 py-0.5 bg-white border-2 border-slate-800 rounded-lg font-arcade">SPACE</span>
+                    <span>물풍선</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="px-2 py-0.5 bg-white border-2 border-slate-800 rounded-lg font-arcade">CTRL / C</span>
+                    <span>바늘 탈출</span>
+                </div>
+                <div class="text-sky-700">📱 모바일 패드 지원</div>
+            </div>
+
+            <!-- Big Start Buttons -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <button onclick="startMatch()" class="arcade-btn md:col-span-1 py-3.5 rounded-2xl bg-gradient-to-b from-amber-300 to-amber-400 hover:from-amber-200 hover:to-amber-300 font-title text-xl text-slate-900 tracking-wider cursor-pointer">
+                    혼자 하기 (SOLO)
+                </button>
+                <button onclick="openCreateRoom()" class="arcade-btn md:col-span-1 py-3.5 rounded-2xl bg-gradient-to-b from-sky-400 to-sky-500 hover:from-sky-300 hover:to-sky-400 font-title text-xl text-white tracking-wider cursor-pointer">
+                    🏠 방 만들기
+                </button>
+                <button onclick="openJoinRoomModal()" class="arcade-btn md:col-span-1 py-3.5 rounded-2xl bg-gradient-to-b from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 font-title text-xl text-slate-900 tracking-wider cursor-pointer">
+                    🔑 방 입장하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         AI CALIBRATION BENCHMARK REPORT MODAL
+    ========================================================== -->
+    <div id="screenCalibrationResult" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs">
+        <div class="arcade-panel max-w-lg w-full p-6 md:p-7 flex flex-col gap-4">
+            <div class="text-center">
+                <span class="px-3 py-1 rounded-full bg-purple-200 border-2 border-slate-900 text-xs font-black text-purple-900">
+                    AI BENCHMARK CALIBRATION COMPLETE
+                </span>
+                <h2 class="text-3xl font-title text-slate-900 mt-2">AI 기준 평균 산출 완료!</h2>
+                <p class="text-xs font-bold text-slate-600 mt-1">
+                    방금 플레이한 전투 데이터를 바탕으로 AI 라이벌들의 평균 지능 기준이 갱신되었습니다.
+                </p>
+            </div>
+
+            <!-- Measured Metrics Grid -->
+            <div class="grid grid-cols-2 gap-3 bg-purple-50 border-3 border-slate-900 rounded-2xl p-4 text-xs">
+                <div class="bg-white p-3 rounded-xl border-2 border-slate-800">
+                    <div class="text-slate-500 font-bold">종합 전투력 기준 점수</div>
+                    <div id="calMetricScore" class="font-arcade text-2xl text-purple-600 mt-0.5">0 PTS</div>
+                </div>
+                <div class="bg-white p-3 rounded-xl border-2 border-slate-800">
+                    <div class="text-slate-500 font-bold">초당 물풍선 압박 빈도</div>
+                    <div id="calMetricBombRate" class="font-arcade text-2xl text-sky-600 mt-0.5">0.0 / 분</div>
+                </div>
+                <div class="bg-white p-3 rounded-xl border-2 border-slate-800">
+                    <div class="text-slate-500 font-bold">적 킬 / 블록 파괴</div>
+                    <div id="calMetricKills" class="font-arcade text-2xl text-rose-600 mt-0.5">0킬 / 0개</div>
+                </div>
+                <div class="bg-white p-3 rounded-xl border-2 border-slate-800">
+                    <div class="text-slate-500 font-bold">AI 목표 반응 속도</div>
+                    <div id="calMetricReaction" class="font-arcade text-2xl text-amber-600 mt-0.5">0.05s</div>
+                </div>
+            </div>
+
+            <div class="bg-amber-100 border-2 border-slate-800 rounded-xl p-3 text-xs font-bold text-slate-800">
+                💡 이제 로비와 게임에서 <strong>[🧠 내 기준 AI]</strong> 난이도가 자동 적용되어, 방금 보여주신 공격 템포와 가두기 빈도로 AI들이 덤벼듭니다!
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="closeCalibrationModal(false)" class="arcade-btn flex-1 py-3 rounded-xl bg-slate-200 font-black text-slate-800 cursor-pointer">
+                    로비로 돌아가기
+                </button>
+                <button onclick="closeCalibrationModal(true)" class="arcade-btn flex-1 py-3 rounded-xl bg-purple-400 font-black text-slate-900 cursor-pointer">
+                    내 기준 AI와 바로 대결 ▸
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MULTIPLAYER WAITING ROOM MODAL (HOST & GUESTS)
+    ========================================================== -->
+    <div id="screenRoomLobby" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
+        <div class="arcade-panel max-w-xl w-full p-6 md:p-8 flex flex-col gap-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="px-3 py-1 rounded-full bg-sky-100 border-2 border-slate-900 text-xs font-black text-sky-800">
+                        MULTIPLAYER ROOM
+                    </span>
+                    <h2 class="text-2xl md:text-3xl font-title text-slate-900 mt-1">친구들과 함께하기</h2>
+                </div>
+                <button onclick="leaveRoom()" class="arcade-btn bg-slate-200 px-3.5 py-2 rounded-xl text-xs font-black text-slate-800 cursor-pointer">
+                    나가기 ✕
+                </button>
+            </div>
+
+            <!-- Room Code Box -->
+            <div class="bg-amber-100 border-3 border-slate-900 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div>
+                    <div class="text-xs font-black text-slate-600">방 코드 (친구에게 알려주세요!)</div>
+                    <div id="displayRoomCode" class="font-arcade text-4xl tracking-[0.25em] text-rose-600 mt-0.5">
+                        -----
+                    </div>
+                </div>
+                <button onclick="copyRoomCode()" id="btnCopyCode" class="arcade-btn bg-white px-4 py-2.5 rounded-xl text-xs font-black text-slate-900 cursor-pointer flex items-center gap-1.5">
+                    <span>📋 코드 복사</span>
+                </button>
+            </div>
+
+            <!-- 4 Player Slots -->
+            <div class="bg-sky-50 border-3 border-slate-800 rounded-2xl p-4">
+                <div class="flex items-center justify-between text-xs font-black text-slate-700 mb-3">
+                    <span>참가자 목록 (최대 4명 · 빈 자리는 AI 자동 투입)</span>
+                    <span id="roomPlayerCount" class="text-sky-600">1 / 4</span>
+                </div>
+                <div id="roomSlotsContainer" class="grid grid-cols-2 gap-2.5">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- Host Start vs Guest Waiting Footer -->
+            <div id="roomHostControls" class="hidden">
+                <button onclick="startMultiplayerMatch()" class="arcade-btn w-full py-4 rounded-2xl bg-gradient-to-b from-amber-300 to-amber-400 font-title text-2xl text-slate-900 tracking-wider cursor-pointer">
+                    모두 함께 게임 시작! 🚀
+                </button>
+            </div>
+            <div id="roomGuestNotice" class="hidden text-center py-3 bg-slate-100 border-2 border-slate-300 rounded-2xl text-sm font-black text-slate-600 animate-pulse">
+                방장이 게임을 시작하기를 기다리는 중...
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         JOIN ROOM CODE INPUT MODAL
+    ========================================================== -->
+    <div id="screenJoinModal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
+        <div class="arcade-panel max-w-md w-full p-6 md:p-7 flex flex-col gap-4 text-center">
+            <div class="text-4xl">🔑</div>
+            <h2 class="text-2xl font-title text-slate-900">방 코드 입력하기</h2>
+            <p class="text-xs font-bold text-slate-600">
+                방장 친구에게 받은 5자리 방 코드를 입력하세요.
+            </p>
+            <input id="inputJoinCode" type="text" maxlength="5" placeholder="예: A7K9P"
+                class="w-full py-3.5 px-4 text-center font-arcade text-3xl uppercase tracking-[0.25em] bg-white border-3 border-slate-900 rounded-2xl focus:outline-none focus:ring-4 focus:ring-amber-300 text-slate-900" />
+            <div id="joinErrorMsg" class="hidden text-xs font-black text-rose-600"></div>
+            <div class="flex gap-3 mt-1">
+                <button onclick="closeJoinRoomModal()" class="arcade-btn flex-1 py-3 rounded-xl bg-slate-200 font-black text-slate-800 cursor-pointer">
+                    취소
+                </button>
+                <button onclick="submitJoinRoom()" id="btnSubmitJoin" class="arcade-btn flex-1 py-3 rounded-xl bg-emerald-400 font-black text-slate-900 cursor-pointer">
+                    입장하기 ▸
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         ROUND / MATCH RESULT MODAL
+    ========================================================== -->
+    <div id="screenResult" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div class="arcade-panel max-w-md w-full p-7 text-center">
+            <div id="resultEmoji" class="text-6xl mb-2 animate-bobble">🏆</div>
+            <h2 id="resultTitle" class="text-4xl font-title text-amber-400 title-stroke mb-2">
+                VICTORY!
+            </h2>
+            <p id="resultDesc" class="text-slate-700 font-bold text-sm mb-6">
+                모든 라이벌을 물방울로 터뜨렸습니다!
+            </p>
+            <div class="flex gap-3">
+                <button onclick="returnToLobby()" class="arcade-btn flex-1 py-3 rounded-xl bg-slate-200 font-black text-slate-800 cursor-pointer">
+                    로비로
+                </button>
+                <button id="btnNextStage" onclick="nextStage()" class="arcade-btn flex-1 py-3 rounded-xl bg-emerald-400 font-black text-slate-900 cursor-pointer">
+                    다음 스테이지 ▸
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MOBILE / TOUCH VIRTUAL CONTROLLER (BOTTOM OVERLAY)
+    ========================================================== -->
+    <div id="mobileControls" class="hidden fixed bottom-4 inset-x-4 z-30 flex items-end justify-between pointer-events-none md:hidden">
+        <!-- D-Pad -->
+        <div class="grid grid-cols-3 gap-1.5 w-36 h-36 pointer-events-auto">
+            <div></div>
+            <button id="touch-up" class="dpad-btn flex items-center justify-center text-xl font-black text-slate-800">▲</button>
+            <div></div>
+            <button id="touch-left" class="dpad-btn flex items-center justify-center text-xl font-black text-slate-800">◀</button>
+            <div class="bg-slate-800/20 rounded-full"></div>
+            <button id="touch-right" class="dpad-btn flex items-center justify-center text-xl font-black text-slate-800">▶</button>
+            <div></div>
+            <button id="touch-down" class="dpad-btn flex items-center justify-center text-xl font-black text-slate-800">▼</button>
+            <div></div>
+        </div>
+
+        <!-- Action Buttons: Needle & Water Bomb -->
+        <div class="flex items-end gap-3 pointer-events-auto">
+            <button onclick="useNeedle()" class="dpad-btn w-16 h-16 rounded-full bg-rose-300 flex flex-col items-center justify-center font-black text-xs text-slate-900">
+                <span class="text-lg">📌</span>
+                <span>바늘</span>
+            </button>
+            <button id="touch-bomb" class="dpad-btn w-22 h-22 p-4 rounded-full bg-sky-400 flex flex-col items-center justify-center font-black text-sm text-white">
+                <span class="text-2xl">💧</span>
+                <span>물풍선</span>
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'bubble-pop-arena';
+        let db = null;
+        let auth = null;
+        let currentUserId = null;
+
+        async function initCloudServices() {
+            if (db && currentUserId) return true;
+            try {
+                if (typeof __firebase_config === 'undefined') return false;
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                currentUserId = auth.currentUser?.uid || crypto.randomUUID();
+                return true;
+            } catch (err) {
+                console.error("Cloud init error:", err);
+                return false;
+            }
+        }
+
+        window.CloudBridge = {
+            init: initCloudServices,
+            getUserId: () => currentUserId,
+            getRoomRef: (code) => doc(db, 'artifacts', appId, 'public', 'data', 'bubble_rooms', code),
+            setDoc,
+            getDoc,
+            updateDoc,
+            onSnapshot,
+            deleteField
+        };
+    </script>
+
+    <script>
+        /**
+         * ============================================================================
+         * BUBBLE POP ARENA (크레이지 아케이드 BnB 오마주 아케이드 엔진)
+         * - AI Benchmark Calibration Mode (Measures Player Tempo & Updates AI Baseline)
+         * - 2-Step Lookahead Blast Evasion + Cross-Trap Corner Pinch AI
+         * - Multiplayer Room Creation & 5-Digit Join Code Sync
+         * ============================================================================
+         */
+
+        // ----------------------------------------------------------------------------
+        // 1. RETRO ARCADE SOUND SYNTHESIZER
+        // ----------------------------------------------------------------------------
+        class ArcadeSound {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+
+            tone(f1, f2, dur, type = 'sine', vol = 0.14) {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(f1, now);
+                    if (f2) osc.frequency.exponentialRampToValueAtTime(Math.max(30, f2), now + dur);
+                    gain.gain.setValueAtTime(vol, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + dur);
+                } catch (e) {}
+            }
+
+            placeBomb() { this.tone(320, 560, 0.11, 'sine', 0.16); }
+            explode() {
+                this.tone(180, 42, 0.32, 'sawtooth', 0.18);
+                this.tone(260, 65, 0.25, 'triangle', 0.14);
+            }
+            itemGet() {
+                this.tone(523, 784, 0.09, 'triangle', 0.15);
+                setTimeout(() => this.tone(784, 1046, 0.12, 'triangle', 0.15), 75);
+            }
+            trap() { this.tone(440, 220, 0.25, 'sine', 0.16); }
+            popKill() {
+                this.tone(600, 1200, 0.12, 'square', 0.14);
+                setTimeout(() => this.tone(880, 1400, 0.16, 'triangle', 0.15), 80);
+            }
+            needleEscape() { this.tone(700, 1350, 0.18, 'triangle', 0.18); }
+            click() { this.tone(520, 680, 0.06, 'sine', 0.12); }
+        }
+
+        const sfx = new ArcadeSound();
+
+        function toggleAudio() {
+            sfx.init();
+            sfx.muted = !sfx.muted;
+            document.getElementById('btnAudio').innerText = sfx.muted ? '🔇 OFF' : '🔊 ON';
+        }
+
+        // ----------------------------------------------------------------------------
+        // 2. GRID CONSTANTS & TILE DEFINITIONS
+        // ----------------------------------------------------------------------------
+        const COLS = 15;
+        const ROWS = 13;
+        const TILE_SIZE = 52;
+
+        const TILE = {
+            EMPTY: 0,
+            WALL: 1,
+            BLOCK: 2,
+            BUSH: 3
+        };
+
+        const ITEM = {
+            BOMB: 'bomb',
+            RANGE: 'range',
+            SPEED: 'speed',
+            NEEDLE: 'needle',
+            MAX_POWER: 'max'
+        };
+
+        const CHAR_PRESETS = {
+            bazzi: {
+                name: '다오니',
+                bodyColor: '#f43f5e',
+                hatColor: '#e11d48',
+                bombs: 1,
+                range: 1,
+                speed: 1,
+                maxBombs: 6,
+                maxRange: 7,
+                maxSpeed: 6
+            },
+            dao: {
+                name: '푸른이',
+                bodyColor: '#0ea5e9',
+                hatColor: '#0284c7',
+                bombs: 2,
+                range: 1,
+                speed: 1,
+                maxBombs: 7,
+                maxRange: 6,
+                maxSpeed: 6
+            },
+            marid: {
+                name: '번개',
+                bodyColor: '#f59e0b',
+                hatColor: '#d97706',
+                bombs: 1,
+                range: 1,
+                speed: 2,
+                maxBombs: 6,
+                maxRange: 6,
+                maxSpeed: 7
+            }
+        };
+
+        // ----------------------------------------------------------------------------
+        // 3. CHARACTER ENTITY (PLAYER & AI BOTS)
+        // ----------------------------------------------------------------------------
+        class Character {
+            constructor(id, name, presetKey, gridC, gridR, isPlayer = false) {
+                this.id = id;
+                this.name = name;
+                this.preset = CHAR_PRESETS[presetKey];
+                this.isPlayer = isPlayer;
+
+                this.x = (gridC + 0.5) * TILE_SIZE;
+                this.y = (gridR + 0.5) * TILE_SIZE;
+                this.radius = TILE_SIZE * 0.36;
+
+                this.maxBombs = this.preset.bombs;
+                this.activeBombs = 0;
+                this.blastRange = this.preset.range;
+                this.speedLevel = this.preset.speed;
+                this.needles = isPlayer ? 1 : 0;
+
+                this.alive = true;
+                this.trapped = false;
+                this.trapTimer = 0;
+                this.invulnTimer = 0;
+
+                this.dir = 'down';
+                this.walkAnim = 0;
+
+                this.aiNextDir = null;
+                this.aiThinkTimer = 0;
+                this.aiAggression = 0.85;
+            }
+
+            getMoveSpeed() {
+                if (this.trapped) return 38;
+                return 145 + (this.speedLevel - 1) * 24;
+            }
+
+            getGridPos() {
+                return {
+                    c: Math.floor(this.x / TILE_SIZE),
+                    r: Math.floor(this.y / TILE_SIZE)
+                };
+            }
+        }
+
+        // ----------------------------------------------------------------------------
+        // 4. MAIN BUBBLE POP ARENA GAME ENGINE
+        // ----------------------------------------------------------------------------
+        class BubbleArenaGame {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+
+                this.selectedChar = 'bazzi';
+                this.selectedMap = 'village';
+                this.difficulty = 'hard';
+                this.stage = 1;
+                this.state = 'LOBBY'; // LOBBY, PLAYING, RESULT
+                this.isCalibrationMode = false;
+                this.matchTimer = 150;
+                this.suddenDeathTimer = 0;
+                this.suddenDeathRing = 1;
+
+                // Measured AI Baseline Profile (updated after Calibration Test)
+                this.calibratedProfile = null;
+                this.calMetrics = {
+                    startTime: 0,
+                    bombsPlaced: 0,
+                    blocksBroken: 0,
+                    kills: 0,
+                    itemsCollected: 0
+                };
+
+                this.grid = [];
+                this.bombs = [];
+                this.streams = [];
+                this.items = [];
+                this.characters = [];
+                this.particles = [];
+                this.floatingTexts = [];
+
+                this.keys = {};
+                this.touchDir = null;
+
+                // Multiplayer Room State
+                this.mpMode = 'SOLO';
+                this.roomCode = null;
+                this.roomUnsub = null;
+                this.roomData = null;
+                this.mySlotIndex = 0;
+                this.mpSyncTimer = 0;
+                this.lastProcessedActionTs = 0;
+
+                this.loadSavedCalibration();
+                this.bindEvents();
+                this.resize();
+                this.generateMap(this.selectedMap);
+                this.lastTime = performance.now();
+                requestAnimationFrame((t) => this.loop(t));
+            }
+
+            loadSavedCalibration() {
+                try {
+                    const raw = localStorage.getItem('bubble_ai_baseline_v1');
+                    if (raw) {
+                        this.calibratedProfile = JSON.parse(raw);
+                        this.updateCalibrationLobbyBadge();
+                    }
+                } catch (e) {}
+            }
+
+            updateCalibrationLobbyBadge() {
+                if (!this.calibratedProfile) return;
+                const btn = document.getElementById('diff-calibrated');
+                const scoreBadge = document.getElementById('calibratedScoreBadge');
+                const statusTxt = document.getElementById('calibrationStatusText');
+                if (btn) btn.classList.remove('hidden');
+                if (scoreBadge) scoreBadge.innerText = this.calibratedProfile.score;
+                if (statusTxt) {
+                    statusTxt.innerText = `측정 완료! 내 기준 점수 ${this.calibratedProfile.score}점 (분당 물풍선 ${this.calibratedProfile.bombsPerMin}개)`;
+                }
+            }
+
+            bindEvents() {
+                window.addEventListener('resize', () => this.resize());
+                window.addEventListener('keydown', (e) => {
+                    const k = e.key.toLowerCase();
+                    this.keys[k] = true;
+
+                    if (this.state === 'PLAYING') {
+                        const player = this.getPlayer();
+                        if (!player || !player.alive) return;
+
+                        if (e.code === 'Space') {
+                            e.preventDefault();
+                            this.requestPlaceBomb(player);
+                        } else if (k === 'c' || e.key === 'Control') {
+                            e.preventDefault();
+                            this.triggerPlayerNeedle();
+                        }
+                    }
+                });
+
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.key.toLowerCase()] = false;
+                });
+
+                const bindDirBtn = (id, dir) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const start = (e) => { e.preventDefault(); this.touchDir = dir; el.classList.add('active'); };
+                    const end = (e) => { e.preventDefault(); if (this.touchDir === dir) this.touchDir = null; el.classList.remove('active'); };
+                    el.addEventListener('touchstart', start, { passive: false });
+                    el.addEventListener('touchend', end, { passive: false });
+                    el.addEventListener('mousedown', start);
+                    el.addEventListener('mouseup', end);
+                    el.addEventListener('mouseleave', end);
+                };
+
+                bindDirBtn('touch-up', 'up');
+                bindDirBtn('touch-down', 'down');
+                bindDirBtn('touch-left', 'left');
+                bindDirBtn('touch-right', 'right');
+
+                const bombBtn = document.getElementById('touch-bomb');
+                if (bombBtn) {
+                    const drop = (e) => {
+                        e.preventDefault();
+                        if (this.state === 'PLAYING') {
+                            const p = this.getPlayer();
+                            if (p) this.requestPlaceBomb(p);
+                        }
+                    };
+                    bombBtn.addEventListener('touchstart', drop, { passive: false });
+                    bombBtn.addEventListener('mousedown', drop);
+                }
+            }
+
+            resize() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.canvas.width = this.width;
+                this.canvas.height = this.height;
+            }
+
+            getBoardTransform() {
+                const boardW = COLS * TILE_SIZE;
+                const boardH = ROWS * TILE_SIZE;
+                const isMobile = this.width < 768;
+                const topPad = 68;
+                const bottomPad = isMobile ? 165 : 24;
+                const sidePad = 24;
+
+                const scaleX = (this.width - sidePad * 2) / boardW;
+                const scaleY = (this.height - topPad - bottomPad) / boardH;
+                const scale = Math.min(scaleX, scaleY, 1.35);
+
+                const offsetX = (this.width - boardW * scale) / 2;
+                const offsetY = topPad + (this.height - topPad - bottomPad - boardH * scale) / 2;
+                return { scale, offsetX, offsetY, boardW, boardH };
+            }
+
+            getPlayer() {
+                if (this.mpMode !== 'SOLO' && this.characters[this.mySlotIndex]) {
+                    return this.characters[this.mySlotIndex];
+                }
+                return this.characters.find(c => c.isPlayer);
+            }
+
+            requestPlaceBomb(player) {
+                if (this.mpMode === 'GUEST') {
+                    this.sendGuestAction('BOMB');
+                } else {
+                    this.placeBomb(player);
+                }
+            }
+
+            // ------------------------------------------------------------------------
+            // AI CALIBRATION BENCHMARK TEST (MEASURES PLAYER LEVEL FOR AI BASELINE)
+            // ------------------------------------------------------------------------
+            startCalibrationTest() {
+                this.mpMode = 'SOLO';
+                this.isCalibrationMode = true;
+                this.stage = 1;
+                this.state = 'PLAYING';
+                this.matchTimer = 60; // 1-minute benchmark duel
+                this.suddenDeathTimer = 0;
+                this.suddenDeathRing = 1;
+                this.particles = [];
+                this.floatingTexts = [];
+
+                this.calMetrics = {
+                    startTime: performance.now(),
+                    bombsPlaced: 0,
+                    blocksBroken: 0,
+                    kills: 0,
+                    itemsCollected: 0
+                };
+
+                this.generateMap(this.selectedMap);
+
+                // Fair Mirror Match: Player + 3 Rivals with identical starting stats
+                this.characters = [
+                    new Character('p1', '측정 대상 (나)', this.selectedChar, 1, 1, true),
+                    new Character('bot1', '기준 AI-A', this.selectedChar, COLS - 2, 1, false),
+                    new Character('bot2', '기준 AI-B', this.selectedChar, 1, ROWS - 2, false),
+                    new Character('bot3', '기준 AI-C', this.selectedChar, COLS - 2, ROWS - 2, false)
+                ];
+
+                this.characters.forEach(ch => {
+                    if (!ch.isPlayer) {
+                        ch.needles = 1;
+                        ch.aiAggression = 0.92;
+                    }
+                });
+
+                document.getElementById('screenLobby').classList.add('hidden');
+                document.getElementById('screenResult').classList.add('hidden');
+                document.getElementById('hudTop').classList.remove('hidden');
+                document.getElementById('mobileControls').classList.remove('hidden');
+                document.getElementById('hudModeLabel').innerHTML = `🧪 <span class="text-purple-600 font-black">AI 기준 측정 중</span>`;
+
+                this.updateHud();
+            }
+
+            finishCalibrationTest() {
+                this.state = 'RESULT';
+                this.isCalibrationMode = false;
+                document.getElementById('mobileControls').classList.add('hidden');
+
+                const elapsedSec = Math.max(5, (performance.now() - this.calMetrics.startTime) / 1000);
+                const bombsPerMin = Number(((this.calMetrics.bombsPlaced / elapsedSec) * 60).toFixed(1));
+                const kills = this.calMetrics.kills;
+                const blocks = this.calMetrics.blocksBroken;
+                const items = this.calMetrics.itemsCollected;
+
+                // Compute composite skill rating (100 ~ 1000)
+                const rawScore = Math.round(
+                    kills * 180 +
+                    bombsPerMin * 6 +
+                    blocks * 12 +
+                    items * 20
+                );
+                const score = Math.max(150, Math.min(999, rawScore));
+
+                // Map player's measured tempo to AI parameters
+                const thinkInterval = Number(Math.max(0.04, 0.16 - (score / 1000) * 0.11).toFixed(2));
+                const statBonus = score >= 650 ? 2 : score >= 380 ? 1 : 0;
+                const aggression = Math.min(1.0, 0.65 + (bombsPerMin / 60) * 0.35);
+
+                this.calibratedProfile = {
+                    score,
+                    bombsPerMin,
+                    kills,
+                    blocks,
+                    thinkInterval,
+                    statBonus,
+                    aggression,
+                    measuredAt: Date.now()
+                };
+
+                try {
+                    localStorage.setItem('bubble_ai_baseline_v1', JSON.stringify(this.calibratedProfile));
+                } catch (e) {}
+
+                this.updateCalibrationLobbyBadge();
+                selectDifficulty('calibrated');
+
+                document.getElementById('calMetricScore').innerText = `${score} PTS`;
+                document.getElementById('calMetricBombRate').innerText = `${bombsPerMin}개 / 분`;
+                document.getElementById('calMetricKills').innerText = `${kills}킬 / ${blocks}블록`;
+                document.getElementById('calMetricReaction').innerText = `${thinkInterval}초`;
+
+                document.getElementById('screenCalibrationResult').classList.remove('hidden');
+            }
+
+            // ------------------------------------------------------------------------
+            // MULTIPLAYER ROOM MANAGEMENT (CREATE / JOIN / REALTIME SYNC)
+            // ------------------------------------------------------------------------
+            generateRoomCode() {
+                const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                let code = '';
+                for (let i = 0; i < 5; i++) {
+                    code += chars[Math.floor(Math.random() * chars.length)];
+                }
+                return code;
+            }
+
+            async createRoom() {
+                const ok = await window.CloudBridge.init();
+                if (!ok) {
+                    this.showJoinError('멀티플레이 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+                    return false;
+                }
+                const uid = window.CloudBridge.getUserId();
+                const code = this.generateRoomCode();
+                this.roomCode = code;
+                this.mpMode = 'HOST';
+                this.mySlotIndex = 0;
+
+                const initialRoom = {
+                    code,
+                    hostId: uid,
+                    status: 'WAITING',
+                    theme: this.selectedMap,
+                    difficulty: this.difficulty,
+                    stage: 1,
+                    players: {
+                        [uid]: {
+                            uid,
+                            slot: 0,
+                            name: `${CHAR_PRESETS[this.selectedChar].name} (방장)`,
+                            charKey: this.selectedChar,
+                            x: 1.5 * TILE_SIZE,
+                            y: 1.5 * TILE_SIZE,
+                            dir: 'down',
+                            joinedAt: Date.now()
+                        }
+                    },
+                    createdAt: Date.now()
+                };
+
+                await window.CloudBridge.setDoc(window.CloudBridge.getRoomRef(code), initialRoom);
+                this.listenToRoom(code);
+                return true;
+            }
+
+            async joinRoom(inputCode) {
+                const code = inputCode.trim().toUpperCase();
+                if (code.length < 4) {
+                    this.showJoinError('5자리 방 코드를 정확히 입력해 주세요.');
+                    return false;
+                }
+
+                const ok = await window.CloudBridge.init();
+                if (!ok) {
+                    this.showJoinError('연결을 초기화하지 못했습니다.');
+                    return false;
+                }
+
+                const uid = window.CloudBridge.getUserId();
+                const roomRef = window.CloudBridge.getRoomRef(code);
+                const snap = await window.CloudBridge.getDoc(roomRef);
+
+                if (!snap.exists()) {
+                    this.showJoinError('존재하지 않는 방 코드입니다. 다시 확인해 주세요!');
+                    return false;
+                }
+
+                const data = snap.data();
+                if (data.status !== 'WAITING') {
+                    this.showJoinError('이미 게임이 진행 중인 방입니다!');
+                    return false;
+                }
+
+                const playersObj = data.players || {};
+                const takenSlots = new Set(Object.values(playersObj).map(p => p.slot));
+                let freeSlot = -1;
+                for (let s = 0; s < 4; s++) {
+                    if (!takenSlots.has(s)) {
+                        freeSlot = s;
+                        break;
+                    }
+                }
+
+                if (freeSlot === -1) {
+                    this.showJoinError('방 인원이 가득 찼습니다 (최대 4명).');
+                    return false;
+                }
+
+                this.roomCode = code;
+                this.mpMode = 'GUEST';
+                this.mySlotIndex = freeSlot;
+
+                const spawnCoords = [
+                    { c: 1, r: 1 },
+                    { c: COLS - 2, r: 1 },
+                    { c: 1, r: ROWS - 2 },
+                    { c: COLS - 2, r: ROWS - 2 }
+                ];
+                const sp = spawnCoords[freeSlot];
+
+                await window.CloudBridge.updateDoc(roomRef, {
+                    [`players.${uid}`]: {
+                        uid,
+                        slot: freeSlot,
+                        name: `${CHAR_PRESETS[this.selectedChar].name} (P${freeSlot + 1})`,
+                        charKey: this.selectedChar,
+                        x: (sp.c + 0.5) * TILE_SIZE,
+                        y: (sp.r + 0.5) * TILE_SIZE,
+                        dir: 'down',
+                        joinedAt: Date.now()
+                    }
+                });
+
+                this.listenToRoom(code);
+                return true;
+            }
+
+            showJoinError(msg) {
+                const el = document.getElementById('joinErrorMsg');
+                if (el) {
+                    el.innerText = msg;
+                    el.classList.remove('hidden');
+                }
+            }
+
+            listenToRoom(code) {
+                if (this.roomUnsub) this.roomUnsub();
+                const roomRef = window.CloudBridge.getRoomRef(code);
+
+                this.roomUnsub = window.CloudBridge.onSnapshot(roomRef, (snap) => {
+                    if (!snap.exists()) {
+                        this.leaveRoom();
+                        return;
+                    }
+                    const data = snap.data();
+                    this.roomData = data;
+
+                    if (data.status === 'WAITING') {
+                        this.renderRoomLobbyUI(data);
+                    } else if (data.status === 'PLAYING') {
+                        if (this.state !== 'PLAYING' && this.mpMode === 'GUEST') {
+                            this.startGuestMatchFromRoom(data);
+                        }
+                        if (this.mpMode === 'GUEST') {
+                            this.applyHostSnapshot(data);
+                        } else if (this.mpMode === 'HOST') {
+                            this.applyGuestInputs(data);
+                        }
+                    } else if (data.status === 'RESULT' && this.mpMode === 'GUEST' && this.state === 'PLAYING') {
+                        this.showResult(data.resultVictory, data.resultDesc);
+                    }
+                }, (err) => {
+                    console.error('Room snapshot error:', err);
+                });
+            }
+
+            renderRoomLobbyUI(data) {
+                document.getElementById('screenLobby').classList.add('hidden');
+                document.getElementById('screenJoinModal').classList.add('hidden');
+                document.getElementById('screenResult').classList.add('hidden');
+                document.getElementById('hudTop').classList.add('hidden');
+                document.getElementById('screenRoomLobby').classList.remove('hidden');
+
+                document.getElementById('displayRoomCode').innerText = data.code;
+                const playersList = Object.values(data.players || {}).sort((a, b) => a.slot - b.slot);
+                document.getElementById('roomPlayerCount').innerText = `${playersList.length} / 4`;
+
+                const container = document.getElementById('roomSlotsContainer');
+                container.innerHTML = '';
+
+                const cornerLabels = ['1P (좌상단)', '2P (우상단)', '3P (좌하단)', '4P (우하단)'];
+                for (let s = 0; s < 4; s++) {
+                    const p = playersList.find(item => item.slot === s);
+                    const slotDiv = document.createElement('div');
+                    if (p) {
+                        const preset = CHAR_PRESETS[p.charKey] || CHAR_PRESETS.bazzi;
+                        const isMe = p.uid === window.CloudBridge.getUserId();
+                        slotDiv.className = `p-3 rounded-xl border-2 border-slate-900 bg-white flex items-center gap-2.5 ${isMe ? 'ring-3 ring-amber-300' : ''}`;
+                        slotDiv.innerHTML = `
+                            <div class="w-9 h-9 rounded-full border-2 border-slate-900 flex items-center justify-center text-white font-black text-xs" style="background:${preset.bodyColor}">
+                                ${s + 1}P
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-xs font-black text-slate-900 truncate">${p.name} ${isMe ? '(나)' : ''}</div>
+                                <div class="text-[10px] font-bold text-slate-500">${cornerLabels[s]}</div>
+                            </div>
+                        `;
+                    } else {
+                        slotDiv.className = 'p-3 rounded-xl border-2 border-dashed border-slate-400 bg-slate-100/80 flex items-center gap-2.5 opacity-75';
+                        slotDiv.innerHTML = `
+                            <div class="w-9 h-9 rounded-full bg-slate-300 flex items-center justify-center text-slate-600 font-black text-xs">
+                                AI
+                            </div>
+                            <div>
+                                <div class="text-xs font-black text-slate-600">빈 자리 (AI 봇 참여)</div>
+                                <div class="text-[10px] font-bold text-slate-400">${cornerLabels[s]}</div>
+                            </div>
+                        `;
+                    }
+                    container.appendChild(slotDiv);
+                }
+
+                if (this.mpMode === 'HOST') {
+                    document.getElementById('roomHostControls').classList.remove('hidden');
+                    document.getElementById('roomGuestNotice').classList.add('hidden');
+                } else {
+                    document.getElementById('roomHostControls').classList.add('hidden');
+                    document.getElementById('roomGuestNotice').classList.remove('hidden');
+                }
+            }
+
+            async leaveRoom() {
+                if (this.roomCode && window.CloudBridge.getUserId()) {
+                    try {
+                        const uid = window.CloudBridge.getUserId();
+                        await window.CloudBridge.updateDoc(window.CloudBridge.getRoomRef(this.roomCode), {
+                            [`players.${uid}`]: window.CloudBridge.deleteField()
+                        });
+                    } catch (e) {}
+                }
+                if (this.roomUnsub) {
+                    this.roomUnsub();
+                    this.roomUnsub = null;
+                }
+                this.mpMode = 'SOLO';
+                this.roomCode = null;
+                this.roomData = null;
+                document.getElementById('screenRoomLobby').classList.add('hidden');
+                document.getElementById('screenLobby').classList.remove('hidden');
+            }
+
+            async launchMultiplayerMatch(stageNum = 1) {
+                if (this.mpMode !== 'HOST' || !this.roomData) return;
+
+                this.isCalibrationMode = false;
+                this.stage = stageNum;
+                this.state = 'PLAYING';
+                this.matchTimer = 150;
+                this.suddenDeathTimer = 0;
+                this.suddenDeathRing = 1;
+                this.particles = [];
+                this.floatingTexts = [];
+
+                this.selectedMap = this.roomData.theme || this.selectedMap;
+                this.generateMap(this.selectedMap);
+
+                const spawnCoords = [
+                    { c: 1, r: 1 },
+                    { c: COLS - 2, r: 1 },
+                    { c: 1, r: ROWS - 2 },
+                    { c: COLS - 2, r: ROWS - 2 }
+                ];
+
+                const humanPlayers = Object.values(this.roomData.players || {});
+                const botPresets = ['dao', 'marid', 'bazzi'];
+                this.characters = [];
+
+                for (let s = 0; s < 4; s++) {
+                    const hp = humanPlayers.find(p => p.slot === s);
+                    const sp = spawnCoords[s];
+                    if (hp) {
+                        const isMe = hp.uid === window.CloudBridge.getUserId();
+                        const ch = new Character(hp.uid, hp.name, hp.charKey, sp.c, sp.r, isMe);
+                        ch.isHumanRemote = !isMe;
+                        this.characters.push(ch);
+                    } else {
+                        const botCh = new Character(`bot_${s}`, `AI 라이벌 ${s + 1}`, botPresets[s % 3], sp.c, sp.r, false);
+                        this.applyDifficultyToBot(botCh);
+                        this.characters.push(botCh);
+                    }
+                }
+
+                document.getElementById('screenRoomLobby').classList.add('hidden');
+                document.getElementById('screenResult').classList.add('hidden');
+                document.getElementById('hudTop').classList.remove('hidden');
+                document.getElementById('mobileControls').classList.remove('hidden');
+                document.getElementById('hudModeLabel').innerHTML = `STAGE <span id="hudStage" class="font-arcade text-lg text-emerald-600">${this.stage}</span>`;
+
+                await this.pushHostSnapshot('PLAYING');
+            }
+
+            startGuestMatchFromRoom(data) {
+                this.isCalibrationMode = false;
+                this.stage = data.stage || 1;
+                this.state = 'PLAYING';
+                this.selectedMap = data.theme || 'village';
+                this.particles = [];
+                this.floatingTexts = [];
+
+                if (data.gridJson) {
+                    this.grid = JSON.parse(data.gridJson);
+                }
+
+                const spawnCoords = [
+                    { c: 1, r: 1 },
+                    { c: COLS - 2, r: 1 },
+                    { c: 1, r: ROWS - 2 },
+                    { c: COLS - 2, r: ROWS - 2 }
+                ];
+                const humanPlayers = Object.values(data.players || {});
+                const botPresets = ['dao', 'marid', 'bazzi'];
+                this.characters = [];
+
+                for (let s = 0; s < 4; s++) {
+                    const hp = humanPlayers.find(p => p.slot === s);
+                    const sp = spawnCoords[s];
+                    if (hp) {
+                        const isMe = hp.uid === window.CloudBridge.getUserId();
+                        const ch = new Character(hp.uid, hp.name, hp.charKey, sp.c, sp.r, isMe);
+                        this.characters.push(ch);
+                    } else {
+                        const botCh = new Character(`bot_${s}`, `AI 라이벌 ${s + 1}`, botPresets[s % 3], sp.c, sp.r, false);
+                        this.characters.push(botCh);
+                    }
+                }
+
+                document.getElementById('screenRoomLobby').classList.add('hidden');
+                document.getElementById('screenResult').classList.add('hidden');
+                document.getElementById('hudTop').classList.remove('hidden');
+                document.getElementById('mobileControls').classList.remove('hidden');
+                document.getElementById('hudModeLabel').innerHTML = `STAGE <span id="hudStage" class="font-arcade text-lg text-emerald-600">${this.stage}</span>`;
+            }
+
+            async pushHostSnapshot(statusOverride = null, extra = {}) {
+                if (this.mpMode !== 'HOST' || !this.roomCode) return;
+                try {
+                    const payload = {
+                        status: statusOverride || this.state,
+                        stage: this.stage,
+                        matchTimer: this.matchTimer,
+                        gridJson: JSON.stringify(this.grid),
+                        bombs: this.bombs.map(b => ({ c: b.c, r: b.r, timer: b.timer, range: b.range })),
+                        streams: this.streams.map(s => ({ c: s.c, r: s.r, timer: s.timer, isCenter: s.isCenter })),
+                        items: this.items.map(it => ({ c: it.c, r: it.r, type: it.type })),
+                        chars: this.characters.map(ch => ({
+                            id: ch.id,
+                            x: Math.round(ch.x),
+                            y: Math.round(ch.y),
+                            dir: ch.dir,
+                            alive: ch.alive,
+                            trapped: ch.trapped,
+                            maxBombs: ch.maxBombs,
+                            blastRange: ch.blastRange,
+                            speedLevel: ch.speedLevel,
+                            needles: ch.needles
+                        })),
+                        ...extra
+                    };
+                    await window.CloudBridge.updateDoc(window.CloudBridge.getRoomRef(this.roomCode), payload);
+                } catch (e) {}
+            }
+
+            applyHostSnapshot(data) {
+                if (data.gridJson) {
+                    this.grid = JSON.parse(data.gridJson);
+                }
+                if (typeof data.matchTimer === 'number') {
+                    this.matchTimer = data.matchTimer;
+                }
+                if (Array.isArray(data.bombs)) {
+                    this.bombs = data.bombs.map(b => ({ ...b, pulse: performance.now() * 0.009 }));
+                }
+                if (Array.isArray(data.streams)) {
+                    this.streams = data.streams;
+                }
+                if (Array.isArray(data.items)) {
+                    this.items = data.items.map(it => ({ ...it, bobPhase: performance.now() * 0.004 }));
+                }
+                if (Array.isArray(data.chars)) {
+                    data.chars.forEach((sc, idx) => {
+                        const ch = this.characters[idx];
+                        if (!ch) return;
+                        if (idx !== this.mySlotIndex) {
+                            ch.x = sc.x;
+                            ch.y = sc.y;
+                            ch.dir = sc.dir;
+                        } else if (Math.hypot(ch.x - sc.x, ch.y - sc.y) > TILE_SIZE * 1.4) {
+                            ch.x = sc.x;
+                            ch.y = sc.y;
+                        }
+                        ch.alive = sc.alive;
+                        ch.trapped = sc.trapped;
+                        ch.maxBombs = sc.maxBombs;
+                        ch.blastRange = sc.blastRange;
+                        ch.speedLevel = sc.speedLevel;
+                        ch.needles = sc.needles;
+                    });
+                }
+                this.updateHud();
+            }
+
+            applyGuestInputs(data) {
+                const playersObj = data.players || {};
+                Object.values(playersObj).forEach(p => {
+                    if (p.uid === window.CloudBridge.getUserId()) return;
+                    const ch = this.characters[p.slot];
+                    if (!ch || !ch.alive) return;
+                    if (typeof p.x === 'number' && typeof p.y === 'number') {
+                        ch.x = p.x;
+                        ch.y = p.y;
+                        ch.dir = p.dir || ch.dir;
+                        ch.walkAnim += 0.25;
+                    }
+                    if (p.action && p.action.ts > this.lastProcessedActionTs) {
+                        this.lastProcessedActionTs = p.action.ts;
+                        if (p.action.type === 'BOMB') {
+                            this.placeBomb(ch);
+                        } else if (p.action.type === 'NEEDLE' && ch.trapped && ch.needles > 0) {
+                            ch.needles--;
+                            ch.trapped = false;
+                            ch.invulnTimer = 1.4;
+                        }
+                    }
+                });
+            }
+
+            async sendGuestAction(actionType) {
+                if (this.mpMode !== 'GUEST' || !this.roomCode) return;
+                const uid = window.CloudBridge.getUserId();
+                const me = this.getPlayer();
+                if (!me) return;
+                try {
+                    await window.CloudBridge.updateDoc(window.CloudBridge.getRoomRef(this.roomCode), {
+                        [`players.${uid}.x`]: Math.round(me.x),
+                        [`players.${uid}.y`]: Math.round(me.y),
+                        [`players.${uid}.dir`]: me.dir,
+                        [`players.${uid}.action`]: { type: actionType, ts: Date.now() }
+                    });
+                } catch (e) {}
+            }
+
+            async syncGuestPosition() {
+                if (this.mpMode !== 'GUEST' || !this.roomCode) return;
+                const uid = window.CloudBridge.getUserId();
+                const me = this.getPlayer();
+                if (!me || !me.alive) return;
+                try {
+                    await window.CloudBridge.updateDoc(window.CloudBridge.getRoomRef(this.roomCode), {
+                        [`players.${uid}.x`]: Math.round(me.x),
+                        [`players.${uid}.y`]: Math.round(me.y),
+                        [`players.${uid}.dir`]: me.dir
+                    });
+                } catch (e) {}
+            }
+
+            // ------------------------------------------------------------------------
+            // MAP GENERATION (VILLAGE 10 & PIRATE DECK)
+            // ------------------------------------------------------------------------
+            generateMap(theme) {
+                this.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(TILE.EMPTY));
+                this.bombs = [];
+                this.streams = [];
+                this.items = [];
+
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        if (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) {
+                            this.grid[r][c] = TILE.WALL;
+                        }
+                    }
+                }
+
+                for (let r = 2; r < ROWS - 2; r += 2) {
+                    for (let c = 2; c < COLS - 2; c += 2) {
+                        if (theme === 'pirate' && r >= 4 && r <= 8 && c >= 5 && c <= 9) {
+                            continue;
+                        }
+                        this.grid[r][c] = TILE.WALL;
+                    }
+                }
+
+                const safeCoords = new Set([
+                    '1,1', '2,1', '1,2',
+                    `${COLS - 2},1`, `${COLS - 3},1`, `${COLS - 2},2`,
+                    `1,${ROWS - 2}`, `2,${ROWS - 2}`, `1,${ROWS - 3}`,
+                    `${COLS - 2},${ROWS - 2}`, `${COLS - 3},${ROWS - 2}`, `${COLS - 2},${ROWS - 3}`
+                ]);
+
+                for (let r = 1; r < ROWS - 1; r++) {
+                    for (let c = 1; c < COLS - 1; c++) {
+                        if (this.grid[r][c] !== TILE.EMPTY) continue;
+                        if (safeCoords.has(`${c},${r}`)) continue;
+
+                        const rand = Math.random();
+                        if (theme === 'village') {
+                            if (rand < 0.68) this.grid[r][c] = TILE.BLOCK;
+                            else if (rand < 0.77) this.grid[r][c] = TILE.BUSH;
+                        } else {
+                            if (rand < 0.56) this.grid[r][c] = TILE.BLOCK;
+                        }
+                    }
+                }
+            }
+
+            applyDifficultyToBot(ch) {
+                if (this.difficulty === 'calibrated' && this.calibratedProfile) {
+                    const bonus = this.calibratedProfile.statBonus;
+                    ch.maxBombs = Math.min(6, ch.maxBombs + bonus + Math.floor((this.stage - 1) / 2));
+                    ch.blastRange = Math.min(7, ch.blastRange + bonus + Math.floor((this.stage - 1) / 2));
+                    ch.speedLevel = Math.min(6, ch.speedLevel + bonus + (this.stage > 1 ? 1 : 0));
+                    ch.needles = bonus >= 2 ? 2 : 1;
+                    ch.aiAggression = this.calibratedProfile.aggression;
+                    return;
+                }
+
+                const diffBonus = this.difficulty === 'hell' ? 2 : this.difficulty === 'hard' ? 1 : 0;
+                ch.maxBombs = Math.min(6, ch.maxBombs + diffBonus + Math.floor((this.stage - 1) / 2));
+                ch.blastRange = Math.min(7, ch.blastRange + diffBonus + Math.floor((this.stage - 1) / 2));
+                ch.speedLevel = Math.min(6, ch.speedLevel + diffBonus + (this.stage > 1 ? 1 : 0));
+                ch.needles = this.difficulty === 'hell' ? 2 : this.difficulty === 'hard' ? 1 : 0;
+                ch.aiAggression = this.difficulty === 'hell' ? 1.0 : this.difficulty === 'hard' ? 0.88 : 0.72;
+            }
+
+            startMatch(stageNum = 1) {
+                this.isCalibrationMode = false;
+                this.stage = stageNum;
+                this.state = 'PLAYING';
+                this.matchTimer = 150;
+                this.suddenDeathTimer = 0;
+                this.suddenDeathRing = 1;
+                this.particles = [];
+                this.floatingTexts = [];
+
+                this.generateMap(this.selectedMap);
+
+                const botPool = ['dao', 'marid', 'bazzi'].filter(k => k !== this.selectedChar);
+                this.characters = [
+                    new Character('p1', '나 (PLAYER)', this.selectedChar, 1, 1, true),
+                    new Character('bot1', '라이벌 1', botPool[0] || 'dao', COLS - 2, 1, false),
+                    new Character('bot2', '라이벌 2', botPool[1] || 'marid', 1, ROWS - 2, false),
+                    new Character('bot3', '라이벌 3', 'bazzi', COLS - 2, ROWS - 2, false)
+                ];
+
+                this.characters.forEach(ch => {
+                    if (!ch.isPlayer) this.applyDifficultyToBot(ch);
+                });
+
+                document.getElementById('screenLobby').classList.add('hidden');
+                document.getElementById('screenResult').classList.add('hidden');
+                document.getElementById('hudTop').classList.remove('hidden');
+                document.getElementById('mobileControls').classList.remove('hidden');
+                document.getElementById('hudModeLabel').innerHTML = `STAGE <span id="hudStage" class="font-arcade text-lg text-emerald-600">${this.stage}</span>`;
+
+                this.updateHud();
+            }
+
+            // ------------------------------------------------------------------------
+            // WATER BOMB PLACEMENT & CHAIN EXPLOSION LOGIC
+            // ------------------------------------------------------------------------
+            placeBomb(char) {
+                if (!char.alive || char.trapped) return;
+                if (char.activeBombs >= char.maxBombs) return;
+
+                const { c, r } = char.getGridPos();
+                if (this.grid[r][c] === TILE.WALL || this.grid[r][c] === TILE.BLOCK) return;
+                if (this.bombs.some(b => b.c === c && b.r === r)) return;
+
+                char.activeBombs++;
+                this.bombs.push({
+                    c,
+                    r,
+                    owner: char,
+                    range: char.blastRange,
+                    timer: 2.55,
+                    pulse: 0
+                });
+
+                if (char.isPlayer) {
+                    sfx.placeBomb();
+                    if (this.isCalibrationMode) this.calMetrics.bombsPlaced++;
+                }
+            }
+
+            detonateBomb(bomb) {
+                if (bomb.exploded) return;
+                bomb.exploded = true;
+                bomb.owner.activeBombs = Math.max(0, bomb.owner.activeBombs - 1);
+
+                sfx.explode();
+                this.spawnStream(bomb.c, bomb.r, true, 'center');
+
+                const dirs = [
+                    { dc: 0, dr: -1, name: 'up' },
+                    { dc: 0, dr: 1, name: 'down' },
+                    { dc: -1, dr: 0, name: 'left' },
+                    { dc: 1, dr: 0, name: 'right' }
+                ];
+
+                dirs.forEach(d => {
+                    for (let step = 1; step <= bomb.range; step++) {
+                        const nc = bomb.c + d.dc * step;
+                        const nr = bomb.r + d.dr * step;
+                        if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) break;
+
+                        const cell = this.grid[nr][nc];
+                        if (cell === TILE.WALL) break;
+
+                        const chainedBomb = this.bombs.find(b => !b.exploded && b.c === nc && b.r === nr);
+                        if (chainedBomb) {
+                            this.detonateBomb(chainedBomb);
+                        }
+
+                        this.items = this.items.filter(it => !(it.c === nc && it.r === nr));
+
+                        if (cell === TILE.BLOCK) {
+                            this.grid[nr][nc] = TILE.EMPTY;
+                            if (this.isCalibrationMode && bomb.owner && bomb.owner.isPlayer) {
+                                this.calMetrics.blocksBroken++;
+                            }
+                            this.spawnBlockBreakParticles(nc, nr);
+                            this.maybeDropItem(nc, nr);
+                            this.spawnStream(nc, nr, false, d.name);
+                            break;
+                        }
+
+                        if (cell === TILE.BUSH) {
+                            this.grid[nr][nc] = TILE.EMPTY;
+                        }
+
+                        this.spawnStream(nc, nr, false, d.name);
+                    }
+                });
+            }
+
+            spawnStream(c, r, isCenter, dir) {
+                this.streams.push({
+                    c,
+                    r,
+                    timer: 0.48,
+                    isCenter,
+                    dir
+                });
+            }
+
+            maybeDropItem(c, r) {
+                if (Math.random() > 0.44) return;
+                const roll = Math.random();
+                let type = ITEM.BOMB;
+                if (roll < 0.32) type = ITEM.BOMB;
+                else if (roll < 0.64) type = ITEM.RANGE;
+                else if (roll < 0.88) type = ITEM.SPEED;
+                else if (roll < 0.96) type = ITEM.NEEDLE;
+                else type = ITEM.MAX_POWER;
+
+                this.items.push({ c, r, type, bobPhase: Math.random() * Math.PI * 2 });
+            }
+
+            triggerPlayerNeedle() {
+                const p = this.getPlayer();
+                if (!p || !p.alive || !p.trapped || p.needles <= 0) return;
+                if (this.mpMode === 'GUEST') {
+                    this.sendGuestAction('NEEDLE');
+                    sfx.needleEscape();
+                    return;
+                }
+                p.needles--;
+                p.trapped = false;
+                p.trapTimer = 0;
+                p.invulnTimer = 1.4;
+                sfx.needleEscape();
+                this.spawnFloatingText(p.x, p.y - 24, '📌 바늘 탈출!', '#f43f5e');
+                this.spawnBubblePopParticles(p.x, p.y, '#38bdf8');
+                this.updateHud();
+            }
+
+            // ------------------------------------------------------------------------
+            // MAIN UPDATE LOOP
+            // ------------------------------------------------------------------------
+            loop(now) {
+                const dt = Math.min(0.05, (now - this.lastTime) / 1000);
+                this.lastTime = now;
+
+                if (this.state === 'PLAYING') {
+                    this.updatePlaying(dt);
+                }
+
+                this.render();
+                requestAnimationFrame((t) => this.loop(t));
+            }
+
+            updatePlaying(dt) {
+                if (this.mpMode === 'GUEST') {
+                    const me = this.getPlayer();
+                    if (me && me.alive) {
+                        this.updatePlayerMovement(me, dt);
+                    }
+                    const mins = Math.floor(this.matchTimer / 60);
+                    const secs = Math.floor(this.matchTimer % 60);
+                    document.getElementById('hudTimer').innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+                    this.mpSyncTimer += dt;
+                    if (this.mpSyncTimer >= 0.09) {
+                        this.mpSyncTimer = 0;
+                        this.syncGuestPosition();
+                    }
+                    return;
+                }
+
+                this.matchTimer = Math.max(0, this.matchTimer - dt);
+                const mins = Math.floor(this.matchTimer / 60);
+                const secs = Math.floor(this.matchTimer % 60);
+                const timerEl = document.getElementById('hudTimer');
+                timerEl.innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+                if (!this.isCalibrationMode && this.matchTimer <= 60 && this.suddenDeathRing <= 4) {
+                    timerEl.classList.add('text-rose-600');
+                    this.suddenDeathTimer += dt;
+                    if (this.suddenDeathTimer >= 3.2) {
+                        this.suddenDeathTimer = 0;
+                        this.triggerSuddenDeathRing(this.suddenDeathRing++);
+                    }
+                } else {
+                    timerEl.classList.remove('text-rose-600');
+                }
+
+                this.bombs.forEach(b => {
+                    b.timer -= dt;
+                    b.pulse += dt * 9;
+                    if (b.timer <= 0 && !b.exploded) {
+                        this.detonateBomb(b);
+                    }
+                });
+                this.bombs = this.bombs.filter(b => !b.exploded);
+
+                this.streams.forEach(s => s.timer -= dt);
+                this.streams = this.streams.filter(s => s.timer > 0);
+
+                this.items.forEach(it => it.bobPhase += dt * 4.5);
+
+                this.characters.forEach(ch => {
+                    if (!ch.alive) return;
+
+                    if (ch.invulnTimer > 0) ch.invulnTimer -= dt;
+
+                    if (ch.trapped) {
+                        ch.trapTimer -= dt;
+                        if (!ch.isPlayer && ch.needles > 0 && ch.trapTimer < 3.9) {
+                            ch.needles--;
+                            ch.trapped = false;
+                            ch.invulnTimer = 1.2;
+                            this.spawnBubblePopParticles(ch.x, ch.y, '#38bdf8');
+                            return;
+                        }
+                        if (ch.trapTimer <= 0) {
+                            this.eliminateCharacter(ch, '물방울 시간 초과!');
+                            return;
+                        }
+                    }
+
+                    if (ch.isPlayer) {
+                        this.updatePlayerMovement(ch, dt);
+                    } else if (!ch.isHumanRemote) {
+                        this.updateBotAI(ch, dt);
+                    }
+
+                    if (!ch.trapped && ch.invulnTimer <= 0) {
+                        const { c, r } = ch.getGridPos();
+                        if (this.streams.some(s => s.c === c && s.r === r)) {
+                            ch.trapped = true;
+                            ch.trapTimer = 4.6;
+                            sfx.trap();
+                            this.spawnFloatingText(ch.x, ch.y - 26, '💧 갇혔다!', '#0284c7');
+                        }
+                    }
+
+                    if (!ch.trapped) {
+                        const { c, r } = ch.getGridPos();
+                        const itemIdx = this.items.findIndex(it => it.c === c && it.r === r);
+                        if (itemIdx !== -1) {
+                            const it = this.items[itemIdx];
+                            this.items.splice(itemIdx, 1);
+                            this.applyItem(ch, it.type);
+                            if (this.isCalibrationMode && ch.isPlayer) {
+                                this.calMetrics.itemsCollected++;
+                            }
+                        }
+                    }
+                });
+
+                for (let i = 0; i < this.characters.length; i++) {
+                    for (let j = i + 1; j < this.characters.length; j++) {
+                        const a = this.characters[i];
+                        const b = this.characters[j];
+                        if (!a.alive || !b.alive) continue;
+
+                        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+                        if (dist < TILE_SIZE * 0.65) {
+                            if (a.trapped && !b.trapped) {
+                                if (this.isCalibrationMode && b.isPlayer) this.calMetrics.kills++;
+                                this.eliminateCharacter(a, `${b.name}에게 팡!`);
+                            } else if (b.trapped && !a.trapped) {
+                                if (this.isCalibrationMode && a.isPlayer) this.calMetrics.kills++;
+                                this.eliminateCharacter(b, `${a.name}에게 팡!`);
+                            }
+                        }
+                    }
+                }
+
+                this.particles.forEach(p => {
+                    p.life -= dt;
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    p.vy += 260 * dt;
+                });
+                this.particles = this.particles.filter(p => p.life > 0);
+
+                this.floatingTexts.forEach(ft => {
+                    ft.life -= dt;
+                    ft.y -= 32 * dt;
+                });
+                this.floatingTexts = this.floatingTexts.filter(ft => ft.life > 0);
+
+                if (this.mpMode === 'HOST') {
+                    this.mpSyncTimer += dt;
+                    if (this.mpSyncTimer >= 0.09) {
+                        this.mpSyncTimer = 0;
+                        this.pushHostSnapshot();
+                    }
+                }
+
+                this.updateHud();
+                this.checkWinCondition();
+            }
+
+            eliminateCharacter(ch, reasonText) {
+                if (!ch.alive) return;
+                ch.alive = false;
+                ch.trapped = false;
+                sfx.popKill();
+                this.spawnBubblePopParticles(ch.x, ch.y, ch.preset.bodyColor);
+                this.spawnFloatingText(ch.x, ch.y - 20, `💥 POP! ${reasonText}`, '#f43f5e');
+            }
+
+            applyItem(ch, type) {
+                if (ch.isPlayer) sfx.itemGet();
+
+                if (type === ITEM.BOMB) {
+                    ch.maxBombs = Math.min(ch.preset.maxBombs, ch.maxBombs + 1);
+                    if (ch.isPlayer) this.spawnFloatingText(ch.x, ch.y - 24, '💧 물풍선 +1', '#0284c7');
+                } else if (type === ITEM.RANGE) {
+                    ch.blastRange = Math.min(ch.preset.maxRange, ch.blastRange + 1);
+                    if (ch.isPlayer) this.spawnFloatingText(ch.x, ch.y - 24, '🌊 물줄기 +1', '#2563eb');
+                } else if (type === ITEM.SPEED) {
+                    ch.speedLevel = Math.min(ch.preset.maxSpeed, ch.speedLevel + 1);
+                    if (ch.isPlayer) this.spawnFloatingText(ch.x, ch.y - 24, '🛼 스피드 UP', '#d97706');
+                } else if (type === ITEM.NEEDLE) {
+                    ch.needles++;
+                    if (ch.isPlayer) this.spawnFloatingText(ch.x, ch.y - 24, '📌 바늘 획득!', '#e11d48');
+                } else if (type === ITEM.MAX_POWER) {
+                    ch.blastRange = ch.preset.maxRange;
+                    if (ch.isPlayer) this.spawnFloatingText(ch.x, ch.y - 24, '⚡ 울트라 물줄기 MAX!', '#7c3aed');
+                }
+            }
+
+            // ------------------------------------------------------------------------
+            // SMOOTH GRID MOVEMENT WITH CLASSIC CORNER-SLIDE ASSIST
+            // ------------------------------------------------------------------------
+            updatePlayerMovement(player, dt) {
+                let dx = 0, dy = 0;
+                if (this.keys['arrowup'] || this.keys['w'] || this.touchDir === 'up') { dy = -1; player.dir = 'up'; }
+                else if (this.keys['arrowdown'] || this.keys['s'] || this.touchDir === 'down') { dy = 1; player.dir = 'down'; }
+                else if (this.keys['arrowleft'] || this.keys['a'] || this.touchDir === 'left') { dx = -1; player.dir = 'left'; }
+                else if (this.keys['arrowright'] || this.keys['d'] || this.touchDir === 'right') { dx = 1; player.dir = 'right'; }
+
+                if (dx !== 0 || dy !== 0) {
+                    player.walkAnim += dt * 12;
+                    this.moveCharacterWithCornerAssist(player, dx, dy, dt);
+                }
+            }
+
+            moveCharacterWithCornerAssist(ch, dx, dy, dt) {
+                const spd = ch.getMoveSpeed();
+                const step = spd * dt;
+                const { c, r } = ch.getGridPos();
+                const centerX = (c + 0.5) * TILE_SIZE;
+                const centerY = (r + 0.5) * TILE_SIZE;
+
+                const isTileBlocked = (tc, tr) => {
+                    if (tc < 0 || tc >= COLS || tr < 0 || tr >= ROWS) return true;
+                    const t = this.grid[tr][tc];
+                    if (t === TILE.WALL || t === TILE.BLOCK) return true;
+                    const bomb = this.bombs.find(b => b.c === tc && b.r === tr);
+                    if (bomb) {
+                        const distToBomb = Math.hypot(ch.x - (tc + 0.5) * TILE_SIZE, ch.y - (tr + 0.5) * TILE_SIZE);
+                        if (distToBomb > TILE_SIZE * 0.68) return true;
+                    }
+                    return false;
+                };
+
+                if (dx !== 0) {
+                    const nextC = c + dx;
+                    if (isTileBlocked(nextC, r)) {
+                        if (dx > 0 && ch.x + step > centerX) ch.x = centerX;
+                        else if (dx < 0 && ch.x - step < centerX) ch.x = centerX;
+                        else ch.x += dx * step;
+                    } else {
+                        const diffY = centerY - ch.y;
+                        if (Math.abs(diffY) > 1) {
+                            ch.y += Math.sign(diffY) * Math.min(Math.abs(diffY), step * 0.85);
+                        }
+                        ch.x += dx * step;
+                    }
+                } else if (dy !== 0) {
+                    const nextR = r + dy;
+                    if (isTileBlocked(c, nextR)) {
+                        if (dy > 0 && ch.y + step > centerY) ch.y = centerY;
+                        else if (dy < 0 && ch.y - step < centerY) ch.y = centerY;
+                        else ch.y += dy * step;
+                    } else {
+                        const diffX = centerX - ch.x;
+                        if (Math.abs(diffX) > 1) {
+                            ch.x += Math.sign(diffX) * Math.min(Math.abs(diffX), step * 0.85);
+                        }
+                        ch.y += dy * step;
+                    }
+                }
+            }
+
+            // ------------------------------------------------------------------------
+            // UPGRADED TACTICAL BOT AI (CHAIN PREDICTION, ESCAPE SAFETY & CORNER TRAP)
+            // ------------------------------------------------------------------------
+            getDangerSet(extraBomb = null) {
+                const dangerSet = new Set();
+                this.streams.forEach(s => dangerSet.add(`${s.c},${s.r}`));
+                const allBombs = extraBomb ? [...this.bombs, extraBomb] : this.bombs;
+
+                allBombs.forEach(b => {
+                    dangerSet.add(`${b.c},${b.r}`);
+                    const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+                    dirs.forEach(([dc, dr]) => {
+                        for (let s = 1; s <= b.range; s++) {
+                            const nc = b.c + dc * s;
+                            const nr = b.r + dr * s;
+                            if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) break;
+                            if (this.grid[nr][nc] === TILE.WALL || this.grid[nr][nc] === TILE.BLOCK) break;
+                            dangerSet.add(`${nc},${nr}`);
+                        }
+                    });
+                });
+                return dangerSet;
+            }
+
+            // Ensures bot actually has a multi-tile safe pocket (not a dead-end 1-tile pocket)
+            hasEscapeRoute(bot, startC, startR, dangerSet) {
+                const queue = [{ c: startC, r: startR, dist: 0 }];
+                const visited = new Set([`${startC},${startR}`]);
+                const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+                let safeTilesFound = 0;
+
+                while (queue.length > 0) {
+                    const curr = queue.shift();
+                    if (!dangerSet.has(`${curr.c},${curr.r}`)) {
+                        safeTilesFound++;
+                        if (safeTilesFound >= 2 || curr.dist >= 2) return true;
+                    }
+                    if (curr.dist >= 6) continue;
+
+                    for (const [dc, dr] of dirs) {
+                        const nc = curr.c + dc;
+                        const nr = curr.r + dr;
+                        const key = `${nc},${nr}`;
+                        if (!visited.has(key) && this.canWalkTile(nc, nr)) {
+                            visited.add(key);
+                            queue.push({ c: nc, r: nr, dist: curr.dist + 1 });
+                        }
+                    }
+                }
+                return safeTilesFound >= 1;
+            }
+
+            updateBotAI(bot, dt) {
+                bot.walkAnim += dt * 12;
+                const { c, r } = bot.getGridPos();
+                const dangerSet = this.getDangerSet();
+                const inDanger = dangerSet.has(`${c},${r}`);
+
+                let thinkInterval = this.difficulty === 'hell' ? 0.05 : this.difficulty === 'hard' ? 0.09 : 0.16;
+                if (this.difficulty === 'calibrated' && this.calibratedProfile) {
+                    thinkInterval = this.calibratedProfile.thinkInterval;
+                }
+
+                bot.aiThinkTimer -= dt;
+                if (inDanger || !bot.aiNextDir || bot.aiThinkTimer <= 0) {
+                    bot.aiThinkTimer = thinkInterval;
+                    bot.aiNextDir = this.computeBotDirection(bot, c, r, dangerSet, inDanger);
+                }
+
+                if (bot.aiNextDir) {
+                    bot.dir = bot.aiNextDir;
+                    const vec = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[bot.aiNextDir];
+                    this.moveCharacterWithCornerAssist(bot, vec[0], vec[1], dt);
+                }
+
+                // Smart Bomb Placement: Block clearing + Aggressive Player Corner Pinching
+                if (!inDanger && !bot.trapped && bot.activeBombs < bot.maxBombs) {
+                    const adj = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+                    const nearBlock = adj.some(([dc, dr]) => this.grid[r + dr]?.[c + dc] === TILE.BLOCK);
+
+                    const canHitRival = this.characters.some(other => {
+                        if (other.id === bot.id || !other.alive || other.trapped) return false;
+                        const oc = other.getGridPos().c;
+                        const or = other.getGridPos().r;
+                        const manhattan = Math.abs(oc - c) + Math.abs(or - r);
+                        if (manhattan <= 2) return true;
+                        if (oc === c && Math.abs(or - r) <= bot.blastRange) return true;
+                        if (or === r && Math.abs(oc - c) <= bot.blastRange) return true;
+                        return false;
+                    });
+
+                    if (nearBlock || (canHitRival && Math.random() < (bot.aiAggression || 0.85))) {
+                        const simulatedDanger = this.getDangerSet({ c, r, range: bot.blastRange });
+                        if (this.hasEscapeRoute(bot, c, r, simulatedDanger)) {
+                            this.placeBomb(bot);
+                            bot.aiThinkTimer = 0;
+                        }
+                    }
+                }
+            }
+
+            computeBotDirection(bot, startC, startR, dangerSet, inDanger) {
+                const dirs = [
+                    { name: 'up', dc: 0, dr: -1 },
+                    { name: 'down', dc: 0, dr: 1 },
+                    { name: 'left', dc: -1, dr: 0 },
+                    { name: 'right', dc: 1, dr: 0 }
+                ];
+
+                const ordered = [...dirs].sort(() => Math.random() - 0.5);
+                const queue = [];
+                const visited = new Set([`${startC},${startR}`]);
+
+                ordered.forEach(d => {
+                    const nc = startC + d.dc;
+                    const nr = startR + d.dr;
+                    if (this.canWalkTile(nc, nr)) {
+                        queue.push({ c: nc, r: nr, firstDir: d.name, dist: 1 });
+                        visited.add(`${nc},${nr}`);
+                    }
+                });
+
+                let bestBlockDir = null;
+                let bestHuntDir = null;
+                const fallbackDir = queue.length > 0 ? queue[0].firstDir : null;
+                const player = this.getPlayer();
+
+                while (queue.length > 0) {
+                    const curr = queue.shift();
+                    const key = `${curr.c},${curr.r}`;
+                    const isSafe = !dangerSet.has(key);
+
+                    // Priority 1: Escape active blast danger immediately
+                    if (inDanger && isSafe) {
+                        return curr.firstDir;
+                    }
+
+                    if (!inDanger && isSafe) {
+                        // Priority 2: Pop a rival trapped in a water bubble!
+                        const trappedRival = this.characters.find(o =>
+                            o.id !== bot.id && o.alive && o.trapped &&
+                            o.getGridPos().c === curr.c && o.getGridPos().r === curr.r
+                        );
+                        if (trappedRival) return curr.firstDir;
+
+                        // Priority 3: Grab dropped power-up items
+                        if (this.items.some(it => it.c === curr.c && it.r === curr.r)) {
+                            return curr.firstDir;
+                        }
+
+                        // Priority 4: Move adjacent to nearest destructible block to blast open paths
+                        if (!bestBlockDir) {
+                            const adjBlock = dirs.some(d => this.grid[curr.r + d.dr]?.[curr.c + d.dc] === TILE.BLOCK);
+                            if (adjBlock) bestBlockDir = curr.firstDir;
+                        }
+
+                        // Priority 5: Hunt open path toward player or rival
+                        if (!bestHuntDir) {
+                            const targetRival = (player && player.alive && !player.trapped)
+                                ? player
+                                : this.characters.find(o => o.id !== bot.id && o.alive && !o.trapped);
+                            if (targetRival) {
+                                const tc = targetRival.getGridPos().c;
+                                const tr = targetRival.getGridPos().r;
+                                if (Math.abs(curr.c - tc) + Math.abs(curr.r - tr) <= 2) {
+                                    bestHuntDir = curr.firstDir;
+                                }
+                            }
+                        }
+                    }
+
+                    if (curr.dist < 14) {
+                        for (const d of ordered) {
+                            const nc = curr.c + d.dc;
+                            const nr = curr.r + d.dr;
+                            const nKey = `${nc},${nr}`;
+                            if (!visited.has(nKey) && this.canWalkTile(nc, nr)) {
+                                if (!inDanger && dangerSet.has(nKey)) continue;
+                                visited.add(nKey);
+                                queue.push({ c: nc, r: nr, firstDir: curr.firstDir, dist: curr.dist + 1 });
+                            }
+                        }
+                    }
+                }
+
+                return bestHuntDir || bestBlockDir || fallbackDir;
+            }
+
+            triggerSuddenDeathRing(ring) {
+                sfx.explode();
+                const minC = ring;
+                const maxC = COLS - 1 - ring;
+                const minR = ring;
+                const maxR = ROWS - 1 - ring;
+
+                for (let r = minR; r <= maxR; r++) {
+                    for (let c = minC; c <= maxC; c++) {
+                        if (r === minR || r === maxR || c === minC || c === maxC) {
+                            this.grid[r][c] = TILE.WALL;
+                            this.items = this.items.filter(it => !(it.c === c && it.r === r));
+                            this.spawnBlockBreakParticles(c, r);
+
+                            this.characters.forEach(ch => {
+                                if (ch.alive && ch.getGridPos().c === c && ch.getGridPos().r === r) {
+                                    this.eliminateCharacter(ch, '서든데스 압사!');
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+
+            canWalkTile(c, r) {
+                if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
+                const t = this.grid[r][c];
+                if (t === TILE.WALL || t === TILE.BLOCK) return false;
+                if (this.bombs.some(b => b.c === c && b.r === r)) return false;
+                return true;
+            }
+
+            // ------------------------------------------------------------------------
+            // HUD & WIN/LOSS CONDITION
+            // ------------------------------------------------------------------------
+            updateHud() {
+                const p = this.getPlayer();
+                if (!p) return;
+
+                document.getElementById('hudBombMax').innerText = p.maxBombs;
+                document.getElementById('hudRange').innerText = p.blastRange;
+                document.getElementById('hudSpeed').innerText = p.speedLevel;
+                document.getElementById('hudNeedles').innerText = p.needles;
+
+                const needleBtn = document.getElementById('btnUseNeedle');
+                if (p.trapped && p.needles > 0) {
+                    needleBtn.classList.add('animate-bounce', 'bg-rose-400', 'text-white');
+                } else {
+                    needleBtn.classList.remove('animate-bounce', 'bg-rose-400', 'text-white');
+                }
+            }
+
+            checkWinCondition() {
+                if (this.mpMode === 'GUEST') return;
+
+                if (this.isCalibrationMode) {
+                    const p = this.getPlayer();
+                    const aliveBots = this.characters.filter(c => !c.isPlayer && c.alive);
+                    if (!p || !p.alive || aliveBots.length === 0 || this.matchTimer <= 0) {
+                        this.finishCalibrationTest();
+                    }
+                    return;
+                }
+
+                if (this.mpMode === 'HOST') {
+                    const aliveChars = this.characters.filter(c => c.alive);
+                    if (aliveChars.length <= 1 || this.matchTimer <= 0) {
+                        const winner = aliveChars[0];
+                        const desc = winner
+                            ? `최후의 승자: ${winner.name}!`
+                            : '제한 시간이 종료되어 무승부로 끝났습니다!';
+                        this.showResult(!!winner, desc);
+                        this.pushHostSnapshot('RESULT', { resultVictory: !!winner, resultDesc: desc });
+                    }
+                    return;
+                }
+
+                const p = this.getPlayer();
+                const aliveBots = this.characters.filter(c => !c.isPlayer && c.alive);
+
+                if (!p || !p.alive) {
+                    this.showResult(false, '물방울에 갇혀 터져버렸습니다!');
+                } else if (aliveBots.length === 0) {
+                    this.showResult(true, `스테이지 ${this.stage} 클리어! 모든 라이벌을 제압했습니다!`);
+                } else if (this.matchTimer <= 0) {
+                    this.showResult(false, '제한 시간이 종료되었습니다!');
+                }
+            }
+
+            showResult(isVictory, desc) {
+                this.state = 'RESULT';
+                document.getElementById('mobileControls').classList.add('hidden');
+                const modal = document.getElementById('screenResult');
+                modal.classList.remove('hidden');
+
+                document.getElementById('resultEmoji').innerText = isVictory ? '🏆' : '💦';
+                const title = document.getElementById('resultTitle');
+                title.innerText = isVictory ? 'VICTORY!' : 'GAME OVER';
+                title.className = `text-4xl font-title title-stroke mb-2 ${isVictory ? 'text-amber-300' : 'text-sky-300'}`;
+                document.getElementById('resultDesc').innerText = desc;
+
+                const nextBtn = document.getElementById('btnNextStage');
+                if (this.mpMode === 'GUEST') {
+                    nextBtn.innerText = '방장 대기 중...';
+                    nextBtn.onclick = () => {};
+                } else if (this.mpMode === 'HOST') {
+                    nextBtn.innerText = '다음 판 시작 ▸';
+                    nextBtn.onclick = () => this.launchMultiplayerMatch(this.stage + 1);
+                } else {
+                    nextBtn.innerText = isVictory ? '다음 스테이지 ▸' : '다시 도전 ↻';
+                    nextBtn.onclick = () => this.startMatch(isVictory ? this.stage + 1 : this.stage);
+                }
+            }
+
+            // ------------------------------------------------------------------------
+            // RENDERING: BRIGHT HAND-CRAFTED ARCADE TILE WORLD
+            // ------------------------------------------------------------------------
+            render() {
+                const ctx = this.ctx;
+                ctx.clearRect(0, 0, this.width, this.height);
+
+                const { scale, offsetX, offsetY, boardW, boardH } = this.getBoardTransform();
+
+                ctx.save();
+                ctx.translate(offsetX, offsetY);
+                ctx.scale(scale, scale);
+
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                ctx.roundRect(-10, -10, boardW + 20, boardH + 26, 20);
+                ctx.fill();
+
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const x = c * TILE_SIZE;
+                        const y = r * TILE_SIZE;
+                        const cell = this.grid[r][c];
+
+                        if (this.selectedMap === 'village') {
+                            ctx.fillStyle = (r + c) % 2 === 0 ? '#d9f99d' : '#bef264';
+                        } else {
+                            ctx.fillStyle = (r + c) % 2 === 0 ? '#fde68a' : '#fcd34d';
+                        }
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+                        ctx.strokeStyle = 'rgba(30, 41, 59, 0.08)';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+
+                        if (cell === TILE.WALL) {
+                            this.drawWallTile(ctx, x, y);
+                        } else if (cell === TILE.BLOCK) {
+                            this.drawSoftBlockTile(ctx, x, y);
+                        }
+                    }
+                }
+
+                this.items.forEach(it => {
+                    const cx = (it.c + 0.5) * TILE_SIZE;
+                    const cy = (it.r + 0.5) * TILE_SIZE + Math.sin(it.bobPhase) * 3.5;
+
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.22)';
+                    ctx.beginPath();
+                    ctx.ellipse(cx, (it.r + 0.82) * TILE_SIZE, 13, 5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    const bgMap = {
+                        [ITEM.BOMB]: '#38bdf8',
+                        [ITEM.RANGE]: '#60a5fa',
+                        [ITEM.SPEED]: '#fbbf24',
+                        [ITEM.NEEDLE]: '#fb7185',
+                        [ITEM.MAX_POWER]: '#c084fc'
+                    };
+                    const iconMap = {
+                        [ITEM.BOMB]: '💧',
+                        [ITEM.RANGE]: '🌊',
+                        [ITEM.SPEED]: '🛼',
+                        [ITEM.NEEDLE]: '📌',
+                        [ITEM.MAX_POWER]: '⚡'
+                    };
+
+                    ctx.fillStyle = bgMap[it.type];
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 17, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.font = '18px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(iconMap[it.type], cx, cy + 1);
+                    ctx.restore();
+                });
+
+                this.bombs.forEach(b => {
+                    const cx = (b.c + 0.5) * TILE_SIZE;
+                    const cy = (b.r + 0.5) * TILE_SIZE;
+                    const squish = Math.sin(b.pulse) * 2.5;
+
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy + 16, 15, 6, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#0284c7';
+                    ctx.strokeStyle = '#0f172a';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, 19 + squish, 19 - squish, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#bae6fd';
+                    ctx.beginPath();
+                    ctx.ellipse(cx - 6, cy - 6, 6, 4, -0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                this.streams.forEach(s => {
+                    const x = s.c * TILE_SIZE;
+                    const y = s.r * TILE_SIZE;
+                    const alpha = Math.min(1, s.timer * 3);
+
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = s.isCenter ? '#0284c7' : '#38bdf8';
+                    ctx.fillRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+
+                    ctx.fillStyle = '#e0f2fe';
+                    ctx.fillRect(x + 11, y + 11, TILE_SIZE - 22, TILE_SIZE - 22);
+                    ctx.restore();
+                });
+
+                const sortedChars = [...this.characters].sort((a, b) => a.y - b.y);
+                sortedChars.forEach(ch => {
+                    if (!ch.alive) return;
+                    this.drawCharacter(ctx, ch);
+                });
+
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        if (this.grid[r][c] === TILE.BUSH) {
+                            this.drawBushTile(ctx, c * TILE_SIZE, r * TILE_SIZE);
+                        }
+                    }
+                }
+
+                this.particles.forEach(p => {
+                    ctx.save();
+                    ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+                    ctx.fillStyle = p.color;
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                });
+
+                this.floatingTexts.forEach(ft => {
+                    ctx.save();
+                    ctx.globalAlpha = Math.min(1, ft.life * 1.5);
+                    ctx.font = '900 15px "Noto Sans KR"';
+                    ctx.textAlign = 'center';
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.lineWidth = 4;
+                    ctx.strokeText(ft.text, ft.x, ft.y);
+                    ctx.fillStyle = ft.color;
+                    ctx.fillText(ft.text, ft.x, ft.y);
+                    ctx.restore();
+                });
+
+                ctx.restore();
+            }
+
+            drawWallTile(ctx, x, y) {
+                ctx.save();
+                ctx.fillStyle = this.selectedMap === 'village' ? '#475569' : '#78350f';
+                ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+                ctx.fillStyle = this.selectedMap === 'village' ? '#94a3b8' : '#b45309';
+                ctx.fillRect(x + 3, y + 2, TILE_SIZE - 6, TILE_SIZE - 10);
+
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                ctx.restore();
+            }
+
+            drawSoftBlockTile(ctx, x, y) {
+                ctx.save();
+                ctx.fillStyle = this.selectedMap === 'village' ? '#ea580c' : '#92400e';
+                ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+
+                ctx.fillStyle = this.selectedMap === 'village' ? '#fb923c' : '#d97706';
+                ctx.fillRect(x + 4, y + 3, TILE_SIZE - 8, TILE_SIZE - 11);
+
+                ctx.strokeStyle = '#7c2d12';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 7, y + 6, TILE_SIZE - 14, TILE_SIZE - 16);
+
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(x + 1.5, y + 1.5, TILE_SIZE - 3, TILE_SIZE - 3);
+                ctx.restore();
+            }
+
+            drawBushTile(ctx, x, y) {
+                ctx.save();
+                ctx.fillStyle = '#16a34a';
+                ctx.strokeStyle = '#14532d';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(x + 16, y + 28, 13, 0, Math.PI * 2);
+                ctx.arc(x + 36, y + 28, 13, 0, Math.PI * 2);
+                ctx.arc(x + 26, y + 18, 15, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            drawCharacter(ctx, ch) {
+                ctx.save();
+                const bob = Math.abs(Math.sin(ch.walkAnim)) * 3;
+                const drawY = ch.y - bob;
+
+                if (ch.invulnTimer > 0 && Math.floor(ch.invulnTimer * 16) % 2 === 0) {
+                    ctx.globalAlpha = 0.5;
+                }
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.28)';
+                ctx.beginPath();
+                ctx.ellipse(ch.x, ch.y + 16, 15, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = ch.preset.bodyColor;
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(ch.x, drawY + 2, 16, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#fef3c7';
+                ctx.beginPath();
+                ctx.ellipse(ch.x, drawY + 3, 12, 9, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                const eyeOffX = ch.dir === 'left' ? -4 : ch.dir === 'right' ? 4 : 0;
+                const eyeOffY = ch.dir === 'up' ? -3 : ch.dir === 'down' ? 2 : 0;
+                if (ch.dir !== 'up') {
+                    ctx.fillStyle = '#1e293b';
+                    ctx.beginPath();
+                    ctx.arc(ch.x - 4 + eyeOffX, drawY + 2 + eyeOffY, 2.2, 0, Math.PI * 2);
+                    ctx.arc(ch.x + 4 + eyeOffX, drawY + 2 + eyeOffY, 2.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                if (ch.trapped) {
+                    const pulse = Math.sin(performance.now() * 0.01) * 2;
+                    ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
+                    ctx.strokeStyle = '#0284c7';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(ch.x, drawY, 26 + pulse, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+                    ctx.beginPath();
+                    ctx.arc(ch.x - 9, drawY - 9, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                if (ch.isPlayer) {
+                    ctx.fillStyle = '#fde047';
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(ch.x, drawY - 22);
+                    ctx.lineTo(ch.x - 6, drawY - 30);
+                    ctx.lineTo(ch.x + 6, drawY - 30);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            // ------------------------------------------------------------------------
+            // PARTICLE & TEXT EFFECTS
+            // ------------------------------------------------------------------------
+            spawnBlockBreakParticles(c, r) {
+                const cx = (c + 0.5) * TILE_SIZE;
+                const cy = (r + 0.5) * TILE_SIZE;
+                for (let i = 0; i < 8; i++) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const spd = 70 + Math.random() * 140;
+                    this.particles.push({
+                        x: cx,
+                        y: cy,
+                        vx: Math.cos(ang) * spd,
+                        vy: Math.sin(ang) * spd - 80,
+                        size: 4 + Math.random() * 4,
+                        color: '#fb923c',
+                        life: 0.45,
+                        maxLife: 0.45
+                    });
+                }
+            }
+
+            spawnBubblePopParticles(x, y, color) {
+                for (let i = 0; i < 16; i++) {
+                    const ang = (Math.PI * 2 / 16) * i;
+                    const spd = 110 + Math.random() * 130;
+                    this.particles.push({
+                        x,
+                        y,
+                        vx: Math.cos(ang) * spd,
+                        vy: Math.sin(ang) * spd - 60,
+                        size: 5 + Math.random() * 4,
+                        color: i % 2 === 0 ? '#38bdf8' : color,
+                        life: 0.55,
+                        maxLife: 0.55
+                    });
+                }
+            }
+
+            spawnFloatingText(x, y, text, color) {
+                this.floatingTexts.push({ x, y, text, color, life: 1.0 });
+            }
+        }
+
+        // ----------------------------------------------------------------------------
+        // GLOBAL LOBBY & UI BINDINGS
+        // ----------------------------------------------------------------------------
+        const game = new BubbleArenaGame();
+
+        function selectCharacter(key) {
+            sfx.init();
+            sfx.click();
+            game.selectedChar = key;
+
+            const traits = {
+                bazzi: '밸런스형 (기본 능력치 균형)',
+                dao: '물풍선 특화 (시작 물풍선 2개)',
+                marid: '스피드 특화 (시작 이동속도 +1)'
+            };
+            document.getElementById('charTraitBadge').innerText = traits[key];
+
+            ['bazzi', 'dao', 'marid'].forEach(c => {
+                const el = document.getElementById(`char-${c}`);
+                if (!el) return;
+                if (c === key) {
+                    const bg = c === 'bazzi' ? 'bg-rose-400' : c === 'dao' ? 'bg-sky-400' : 'bg-amber-300';
+                    el.className = `arcade-btn ${bg} p-2.5 rounded-2xl flex flex-col items-center gap-1 cursor-pointer ring-4 ring-amber-300`;
+                } else {
+                    el.className = 'arcade-btn bg-white text-slate-800 p-2.5 rounded-2xl flex flex-col items-center gap-1 cursor-pointer';
+                }
+            });
+        }
+
+        function selectMap(theme) {
+            sfx.init();
+            sfx.click();
+            game.selectedMap = theme;
+            game.generateMap(theme);
+
+            ['village', 'pirate'].forEach(m => {
+                const el = document.getElementById(`map-${m}`);
+                if (!el) return;
+                if (m === theme) {
+                    el.className = 'arcade-btn bg-emerald-400 p-2.5 rounded-2xl text-left cursor-pointer ring-4 ring-amber-300';
+                } else {
+                    el.className = 'arcade-btn bg-white p-2.5 rounded-2xl text-left cursor-pointer';
+                }
+            });
+        }
+
+        function selectDifficulty(level) {
+            sfx.init();
+            sfx.click();
+            game.difficulty = level;
+
+            ['normal', 'hard', 'hell', 'calibrated'].forEach(d => {
+                const el = document.getElementById(`diff-${d}`);
+                if (!el) return;
+                if (d === 'calibrated' && !game.calibratedProfile) return;
+
+                if (d === level) {
+                    const bg = d === 'hell' ? 'bg-rose-500 text-white'
+                             : d === 'calibrated' ? 'bg-purple-500 text-white'
+                             : d === 'hard' ? 'bg-amber-300 text-slate-900'
+                             : 'bg-sky-300 text-slate-900';
+                    el.className = `arcade-btn ${bg} px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer ring-3 ring-slate-900`;
+                } else {
+                    const txt = d === 'hell' ? 'text-rose-700' : d === 'calibrated' ? 'text-purple-700' : 'text-slate-800';
+                    el.className = `arcade-btn bg-white px-3 py-1.5 rounded-xl text-xs font-black ${txt} cursor-pointer`;
+                }
+            });
+        }
+
+        function startCalibrationTest() {
+            sfx.init();
+            sfx.click();
+            game.startCalibrationTest();
+        }
+
+        function closeCalibrationModal(startImmediately) {
+            sfx.click();
+            document.getElementById('screenCalibrationResult').classList.add('hidden');
+            if (startImmediately) {
+                game.mpMode = 'SOLO';
+                game.startMatch(1);
+            } else {
+                returnToLobby();
+            }
+        }
+
+        function startMatch() {
+            sfx.init();
+            sfx.click();
+            game.mpMode = 'SOLO';
+            game.startMatch(1);
+        }
+
+        async function openCreateRoom() {
+            sfx.init();
+            sfx.click();
+            await game.createRoom();
+        }
+
+        function openJoinRoomModal() {
+            sfx.init();
+            sfx.click();
+            document.getElementById('joinErrorMsg').classList.add('hidden');
+            document.getElementById('inputJoinCode').value = '';
+            document.getElementById('screenJoinModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('inputJoinCode').focus(), 60);
+        }
+
+        function closeJoinRoomModal() {
+            sfx.click();
+            document.getElementById('screenJoinModal').classList.add('hidden');
+        }
+
+        async function submitJoinRoom() {
+            sfx.init();
+            sfx.click();
+            const code = document.getElementById('inputJoinCode').value;
+            const btn = document.getElementById('btnSubmitJoin');
+            btn.disabled = true;
+            btn.innerText = '입장 중...';
+            await game.joinRoom(code);
+            btn.disabled = false;
+            btn.innerText = '입장하기 ▸';
+        }
+
+        function copyRoomCode() {
+            sfx.click();
+            const code = document.getElementById('displayRoomCode').innerText;
+            const temp = document.createElement('textarea');
+            temp.value = code;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+
+            const btn = document.getElementById('btnCopyCode');
+            btn.innerHTML = '<span>✅ 복사 완료!</span>';
+            setTimeout(() => {
+                btn.innerHTML = '<span>📋 코드 복사</span>';
+            }, 1600);
+        }
+
+        function leaveRoom() {
+            sfx.click();
+            game.leaveRoom();
+        }
+
+        function startMultiplayerMatch() {
+            sfx.init();
+            sfx.click();
+            game.launchMultiplayerMatch(1);
+        }
+
+        function nextStage() {
+            sfx.init();
+            sfx.click();
+            if (game.mpMode === 'HOST') {
+                game.launchMultiplayerMatch(game.stage + 1);
+            } else if (game.mpMode === 'SOLO') {
+                game.startMatch(game.stage + 1);
+            }
+        }
+
+        function useNeedle() {
+            game.triggerPlayerNeedle();
+        }
+
+        function returnToLobby() {
+            sfx.click();
+            game.isCalibrationMode = false;
+            if (game.mpMode !== 'SOLO') {
+                game.leaveRoom();
+            }
+            game.state = 'LOBBY';
+            document.getElementById('hudTop').classList.add('hidden');
+            document.getElementById('screenResult').classList.add('hidden');
+            document.getElementById('screenCalibrationResult').classList.add('hidden');
+            document.getElementById('mobileControls').classList.add('hidden');
+            document.getElementById('screenLobby').classList.remove('hidden');
+            game.generateMap(game.selectedMap);
+        }
+    </script>
+</body>
+</html>
